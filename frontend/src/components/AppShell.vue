@@ -1,32 +1,16 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useI18n } from 'vue-i18n';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-import { NAV_PERMISSIONS } from '../permissions';
-import { setLocale, currentLocale } from '../i18n';
 import Icon from './Icon.vue';
-import PasswordModal from './PasswordModal.vue';
 
-const router = useRouter();
-const route = useRoute();
 const auth = useAuthStore();
-const { t, locale } = useI18n();
+const route = useRoute();
+const router = useRouter();
 
 const theme = ref(localStorage.getItem('crm-theme') || 'dark');
-const sidebarOpen = ref(false);
-// Paket 1, Punkt 3: Passwort-Selbstbedienung. Nach Erfolg Logout (kein
-// token_version-Mechanismus -- ein bereits ausgestelltes JWT bleibt bis zum
-// Ablauf gueltig, siehe MeController-Kommentar; der Logout hier ist die
-// UI-seitige Konsequenz, kein Sicherheitsmechanismus).
-const showPasswordModal = ref(false);
-function onPasswordChanged() {
-    showPasswordModal.value = false;
-    logout();
-}
-
 function applyTheme() {
-    document.documentElement.dataset.theme = theme.value;
+    document.documentElement.setAttribute('data-theme', theme.value);
     localStorage.setItem('crm-theme', theme.value);
 }
 function toggleTheme() {
@@ -35,240 +19,156 @@ function toggleTheme() {
 }
 onMounted(applyTheme);
 
-// Modul #11 Mehrsprachigkeit: kompakter DE/EN-Toggle neben dem Theme-Toggle,
-// gleiche icon-btn-Optik (hier als Text statt Icon, da DE/EN selbst schon
-// das Icon ist -- ein zusaetzliches Icon waere redundant).
-function toggleLocale() {
-    setLocale(currentLocale() === 'de' ? 'en' : 'de');
-}
+const nav = [
+    { to: '/', icon: 'overview', label: 'Übersicht' },
+    { to: '/kontakte', icon: 'contacts', label: 'Kontakte' },
+    { to: '/pipeline', icon: 'pipeline', label: 'Pipeline' },
+    { to: '/aktivitaeten', icon: 'activity', label: 'Aktivitäten' },
+    { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen' },
+];
+
+const title = computed(() => nav.find((n) => n.to === route.path)?.label ?? 'UltraCRM');
+const initials = computed(() => (auth.user?.displayName || auth.user?.username || '?')
+    .split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase());
 
 function logout() {
     auth.logout();
-    router.push({ name: 'login' });
+    router.push('/login');
 }
-
-// Icon/Permission-Schluessel bleiben stabil (key), Labels kommen jetzt aus
-// den Locale-Dateien -- siehe nav.* in src/locales/{de,en}.json.
-const allNav = [
-    { key: 'dashboard', to: { name: 'dashboard' }, labelKey: 'nav.dashboard', icon: 'dashboard' },
-    { key: 'customers', to: { name: 'customers' }, labelKey: 'nav.customers', icon: 'users' },
-    { key: 'submissions', to: { name: 'submissions' }, labelKey: 'nav.submissions', icon: 'file' },
-    { key: 'templates', to: { name: 'templates' }, labelKey: 'nav.templates', icon: 'templates' },
-    { key: 'calendar', to: { name: 'calendar' }, labelKey: 'nav.calendar', icon: 'calendar' },
-    { key: 'holiday', to: { name: 'holiday' }, labelKey: 'nav.holiday', icon: 'umbrella' },
-];
-const adminNav = [
-    { to: { name: 'users' }, labelKey: 'nav.users', icon: 'shield' },
-    { to: { name: 'settings' }, labelKey: 'nav.settings', icon: 'settings' },
-];
-
-// Menüpunkte nach Rechten filtern (Übersicht immer sichtbar; Admin sieht alles)
-const nav = computed(() =>
-    allNav.filter((item) => {
-        const req = NAV_PERMISSIONS[item.key];
-        return !req || auth.can(...req);
-    })
-);
-
-// Seitentitel: aus der Route-Meta (titleKey) oder Uebersicht als Default --
-// siehe router/index.js, das frueher rohe deutsche Strings in meta.title hatte.
-const pageTitle = computed(() => t(route.meta.titleKey || 'nav.dashboard'));
-
-// document.title mitziehen (Punkt 5 des Auftrags) -- bei Routenwechsel UND
-// bei Sprachwechsel (derselbe Titel muss in der neuen Sprache neu uebersetzt werden).
-watch([pageTitle], () => {
-    document.title = `${pageTitle.value} · ${t('app.name')}`;
-}, { immediate: true });
 </script>
 
 <template>
     <div class="shell">
-        <aside class="sidebar" :class="{ open: sidebarOpen }">
-            <div class="side-logo">
-                <div class="logo-mark">U</div>
-                <b>Ultra<span>CRM</span></b>
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand__mark">U</span>
+                <span class="brand__name">UltraCRM</span>
             </div>
 
-            <nav class="side-nav">
-                <router-link v-for="item in nav" :key="item.labelKey" :to="item.to" @click="sidebarOpen = false">
-                    <Icon :name="item.icon" :size="18" /><span>{{ $t(item.labelKey) }}</span>
-                </router-link>
-
-                <template v-if="auth.isAdmin">
-                    <div class="nav-divider">{{ $t('nav.administration') }}</div>
-                    <router-link v-for="item in adminNav" :key="item.labelKey" :to="item.to" @click="sidebarOpen = false">
-                        <Icon :name="item.icon" :size="18" /><span>{{ $t(item.labelKey) }}</span>
-                    </router-link>
-                </template>
+            <nav>
+                <RouterLink v-for="n in nav" :key="n.to" :to="n.to" class="navlink">
+                    <Icon :name="n.icon" :size="19" />
+                    <span>{{ n.label }}</span>
+                </RouterLink>
             </nav>
 
-            <div class="side-user">
-                <div class="avatar">{{ (auth.user?.displayName || '?').slice(0, 2).toUpperCase() }}</div>
-                <div class="side-user-info">
-                    <b>{{ auth.user?.displayName }}</b>
-                    <span>{{ auth.isAdmin ? $t('users.roleAdmin') : $t('users.roleUser') }}</span>
-                </div>
-                <button class="icon-btn locale-btn" :title="$t('locale.switchTo', { lang: locale === 'de' ? $t('locale.en') : $t('locale.de') })" @click="toggleLocale">
-                    {{ locale === 'de' ? $t('locale.de') : $t('locale.en') }}
-                </button>
-                <button class="icon-btn" :title="$t('password.changeButtonTitle')" @click="showPasswordModal = true"><Icon name="key" :size="17" /></button>
-                <button class="icon-btn" :title="$t('nav.logout')" @click="logout"><Icon name="logout" :size="17" /></button>
+            <div class="spacer" />
+
+            <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="navlink">
+                <Icon name="building" :size="19" /><span>Mandanten</span>
+            </RouterLink>
+
+            <div class="account">
+                <span class="avatar">{{ initials }}</span>
+                <span class="account__text">
+                    <span class="t-footnote account__name">{{ auth.user?.displayName }}</span>
+                    <span class="t-caption">{{ auth.isSuperadmin ? 'Superadmin' : 'Angemeldet' }}</span>
+                </span>
             </div>
         </aside>
 
-        <div v-if="sidebarOpen" class="sidebar-backdrop" @click="sidebarOpen = false"></div>
-
         <div class="main">
-            <header class="topbar">
-                <button class="icon-btn burger" @click="sidebarOpen = !sidebarOpen"><Icon name="menu" /></button>
-                <h1>{{ pageTitle }}</h1>
-                <button class="icon-btn" :title="theme === 'dark' ? $t('theme.toLight') : $t('theme.toDark')" @click="toggleTheme">
+            <header class="navbar">
+                <span class="t-footnote crumb">{{ title }}</span>
+                <div class="spacer" />
+                <button class="iconbtn" :title="theme === 'dark' ? 'Helles Erscheinungsbild' : 'Dunkles Erscheinungsbild'" @click="toggleTheme">
                     <Icon :name="theme === 'dark' ? 'sun' : 'moon'" :size="18" />
                 </button>
+                <button class="iconbtn" title="Abmelden" @click="logout">
+                    <Icon name="logout" :size="18" />
+                </button>
             </header>
+
             <main class="content">
-                <router-view />
+                <RouterView />
             </main>
         </div>
-
-        <PasswordModal v-if="showPasswordModal" @close="showPasswordModal = false" @changed="onPasswordChanged" />
     </div>
 </template>
 
 <style scoped>
-.shell { display: flex; min-height: 100vh; }
+.shell { display: grid; grid-template-columns: 264px 1fr; min-height: 100vh; }
 
 .sidebar {
-    width: 250px;
-    flex-shrink: 0;
-    background: var(--surface);
-    border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
-    padding: 22px 14px;
+    gap: var(--sp-2);
+    padding: var(--sp-5) var(--sp-4);
+    background: var(--bg-base);
+    border-right: 1px solid var(--separator);
     position: sticky;
     top: 0;
     height: 100vh;
 }
-.side-logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 10px 24px;
-}
-.logo-mark {
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, var(--accent), #8b5cf6);
-    color: #fff;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.side-logo b { font-size: 1.02rem; }
-.side-logo span { color: var(--accent); }
 
-.side-nav { display: flex; flex-direction: column; gap: 3px; flex: 1; overflow-y: auto; }
-.side-nav a {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 13px;
-    border-radius: 10px;
-    color: var(--ink-soft);
-    text-decoration: none;
-    font-size: 0.92rem;
-    font-weight: 500;
-    transition: background 0.18s, color 0.18s;
-}
-.side-nav a :deep(svg) { opacity: 0.85; }
-.side-nav a:hover { background: var(--surface-2); color: var(--ink); }
-.side-nav a.router-link-exact-active { background: var(--accent); color: #fff; }
-.nav-divider {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--ink-soft);
-    padding: 18px 13px 6px;
-}
-
-.side-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px;
-    border-radius: 12px;
-    background: var(--surface-2);
-    margin-top: 12px;
-}
-.avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), #8b5cf6);
-    color: #fff;
-    font-weight: 700;
-    font-size: 0.78rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-.side-user-info { flex: 1; min-width: 0; }
-.side-user-info b { display: block; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.side-user-info span { color: var(--ink-soft); font-size: 0.74rem; }
-
-.icon-btn {
-    background: none;
-    border: none;
-    color: var(--ink-soft);
-    font-size: 1.05rem;
-    cursor: pointer;
-    padding: 6px;
+.brand { display: flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-2) var(--sp-6); }
+.brand__mark {
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
     border-radius: 8px;
-    transition: color 0.2s, background 0.2s;
+    background: var(--label-primary);
+    color: var(--bg-base);
+    font-weight: 700; font-size: var(--text-subhead);
 }
-.icon-btn:hover { color: var(--ink); background: var(--surface-2); }
-.locale-btn { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; padding: 6px 8px; }
+.brand__name { font-weight: 600; letter-spacing: -0.02em; }
 
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.topbar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 28px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
-    position: sticky;
-    top: 0;
-    z-index: 20;
+nav { display: flex; flex-direction: column; gap: 2px; }
+.navlink {
+    display: flex; align-items: center; gap: var(--sp-3);
+    padding: 9px var(--sp-3);
+    border-radius: var(--radius-s);
+    color: var(--label-secondary);
+    font-size: var(--text-subhead);
+    text-decoration: none;
+    transition: background-color .16s ease, color .16s ease;
 }
-.topbar h1 { font-size: 1.1rem; font-weight: 700; flex: 1; }
-.burger { display: none; }
+.navlink:hover { background: var(--fill-quaternary); color: var(--label-primary); text-decoration: none; }
+.navlink.router-link-exact-active { background: var(--accent-quiet); color: var(--accent); font-weight: 550; }
 
-.content { padding: 28px; }
+.account { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-2) 0; border-top: 1px solid var(--separator); margin-top: var(--sp-3); }
+.account__text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.account__name { color: var(--label-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar {
+    width: 32px; height: 32px; flex: none;
+    display: grid; place-items: center;
+    border-radius: var(--radius-pill);
+    background: var(--fill-tertiary);
+    font-size: var(--text-caption); font-weight: 700;
+}
 
-.sidebar-backdrop { display: none; }
+.main { display: flex; flex-direction: column; min-width: 0; background: var(--bg-grouped); }
 
-@media (max-width: 800px) {
-    .sidebar {
-        position: fixed;
-        z-index: 60;
-        transform: translateX(-100%);
-        transition: transform 0.3s;
-    }
-    .sidebar.open { transform: none; }
-    .sidebar-backdrop {
-        display: block;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: 50;
-    }
-    .burger { display: block; }
-    .content { padding: 18px; }
+/* Navigation-Bar mit dezentem Blur — der Inhalt scrollt darunter durch. */
+.crumb { color: var(--label-tertiary); font-weight: 500; }
+.navbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: var(--sp-4) var(--sp-8);
+    background: var(--nav-bg);
+    backdrop-filter: var(--nav-blur);
+    -webkit-backdrop-filter: var(--nav-blur);
+    border-bottom: 1px solid var(--separator);
+}
+.iconbtn {
+    display: grid; place-items: center;
+    width: 34px; height: 34px;
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--label-secondary);
+    cursor: pointer;
+    transition: background-color .16s ease, color .16s ease;
+}
+.iconbtn:hover { background: var(--fill-quaternary); color: var(--label-primary); }
+
+.content { padding: var(--sp-8); max-width: 1180px; width: 100%; }
+
+@media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; }
+    .sidebar nav { flex-direction: row; }
+    .brand { padding: 0 var(--sp-3) 0 0; }
+    .account, .sidebar > .navlink { display: none; }
+    .content { padding: var(--sp-5) var(--sp-4); }
 }
 </style>

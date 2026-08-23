@@ -1,132 +1,86 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
+import UiButton from '../components/ui/UiButton.vue';
+import UiField from '../components/ui/UiField.vue';
 
-const router = useRouter();
 const auth = useAuthStore();
-const { t } = useI18n();
-
+const router = useRouter();
 const username = ref('');
 const password = ref('');
 const error = ref('');
-const loading = ref(false);
+const busy = ref(false);
 
 async function submit() {
     error.value = '';
-    loading.value = true;
+    busy.value = true;
     try {
         await auth.login(username.value, password.value);
-        router.push({ name: 'dashboard' });
+        router.push('/');
     } catch (e) {
-        error.value = e.response?.status === 401
-            ? t('login.errorInvalid')
-            : t('login.errorGeneric');
+        error.value = e?.response?.status === 401
+            ? 'Benutzername oder Passwort stimmt nicht.'
+            : 'Anmeldung gerade nicht möglich. Bitte später erneut versuchen.';
     } finally {
-        loading.value = false;
+        busy.value = false;
     }
 }
 </script>
 
 <template>
-    <div class="login-page">
-        <div class="login-orb orb-a"></div>
-        <div class="login-orb orb-b"></div>
+    <div class="login">
+        <form class="panel" @submit.prevent="submit">
+            <span class="mark">U</span>
+            <h1 class="t-large-title">UltraCRM</h1>
+            <p class="t-subhead sub">Kundendaten, Vertrieb und Einwilligungen — auf eigenen Servern in Deutschland.</p>
 
-        <form class="login-card card" @submit.prevent="submit">
-            <div class="login-logo">
-                <div class="logo-mark">U</div>
-                <div>
-                    <b>{{ $t('app.name') }}</b>
-                    <span>{{ $t('app.tagline') }}</span>
-                </div>
+            <div class="stack fields">
+                <UiField v-model="username" label="Benutzername" autocomplete="username" placeholder="z. B. alexander" />
+                <UiField v-model="password" label="Passwort" type="password" autocomplete="current-password" placeholder="••••••••" />
             </div>
 
-            <label>
-                {{ $t('login.username') }}
-                <input v-model="username" class="input" type="text" autocomplete="username" required autofocus>
-            </label>
-            <label>
-                {{ $t('login.password') }}
-                <input v-model="password" class="input" type="password" autocomplete="current-password" required>
-            </label>
+            <p v-if="error" class="error t-footnote">{{ error }}</p>
 
-            <p v-if="error" class="login-error">{{ error }}</p>
-
-            <button class="btn login-btn" type="submit" :disabled="loading">
-                {{ loading ? $t('login.submitting') : $t('login.submit') }}
-            </button>
+            <UiButton type="submit" variant="primary" :disabled="busy || !username || !password">
+                {{ busy ? 'Einen Moment…' : 'Anmelden' }}
+            </UiButton>
         </form>
     </div>
 </template>
 
 <style scoped>
-.login-page {
+.login {
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    position: relative;
-    overflow: hidden;
+    display: grid;
+    place-items: center;
+    padding: var(--sp-6);
+    background: var(--bg-grouped);
 }
-.login-orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(120px);
-    opacity: 0.25;
-    pointer-events: none;
-}
-.orb-a { width: 460px; height: 460px; background: var(--accent); top: -140px; right: -100px; }
-.orb-b { width: 400px; height: 400px; background: #8b5cf6; bottom: -120px; left: -110px; }
-
-.login-card {
-    width: 100%;
-    max-width: 400px;
-    padding: 40px 36px;
+.panel {
+    width: min(400px, 100%);
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    position: relative;
-    z-index: 1;
-}
-.login-logo {
-    display: flex;
     align-items: center;
-    gap: 14px;
-    margin-bottom: 10px;
+    text-align: center;
+    gap: var(--sp-3);
+    padding: var(--sp-10) var(--sp-8);
+    background: var(--bg-elevated);
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card);
 }
-.logo-mark {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, var(--accent), #8b5cf6);
-    color: #fff;
-    font-weight: 800;
-    font-size: 1.3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.mark {
+    width: 46px; height: 46px;
+    display: grid; place-items: center;
+    border-radius: var(--radius-m);
+    background: var(--label-primary);
+    color: var(--bg-elevated);
+    font-weight: 700; font-size: var(--text-title-3);
+    margin-bottom: var(--sp-2);
 }
-.login-logo b { display: block; font-size: 1.05rem; }
-.login-logo span { color: var(--ink-soft); font-size: 0.8rem; }
-
-label {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--ink-soft);
-}
-.login-error {
-    color: var(--red);
-    font-size: 0.86rem;
-}
-.login-btn {
-    justify-content: center;
-    padding: 13px;
-    margin-top: 6px;
-}
+.sub { margin: 0; max-width: 30ch; }
+.fields { width: 100%; margin-top: var(--sp-5); text-align: left; }
+.error { color: var(--danger); margin: 0; }
+.panel :deep(.btn) { width: 100%; margin-top: var(--sp-2); padding-block: 12px; font-size: var(--text-body); }
 </style>

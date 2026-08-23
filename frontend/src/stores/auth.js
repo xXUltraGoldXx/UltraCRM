@@ -9,6 +9,7 @@ export const useAuthStore = defineStore('auth', {
     getters: {
         isAuthenticated: (s) => !!s.token,
         isAdmin: (s) => s.user?.roles?.includes('ROLE_ADMIN') ?? false,
+        isSuperadmin: (s) => s.user?.roles?.includes('ROLE_SUPERADMIN') ?? false,
     },
     // kein Getter, da Argument nötig — als Action-artige Methode
 
@@ -17,9 +18,9 @@ export const useAuthStore = defineStore('auth', {
             const { data } = await api.post('/login', { username, password });
             this.token = data.token;
             localStorage.setItem('crm-token', data.token);
-            await this.fetchMe();
+            await this.loadMe();
         },
-        async fetchMe() {
+        async loadMe() {
             const { data } = await api.get('/me');
             this.user = data;
         },
