@@ -32,9 +32,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['due_at'], name: 'idx_activity_due')]
 #[ApiResource(
     operations: [
-        new GetCollection(), new Get(),
-        new Post(), new Patch(),
-        new Delete(),
+        new GetCollection(security: "is_granted('PERM', 'activities.view')"),
+        new Get(security: "is_granted('PERM', 'activities.view')"),
+        new Post(security: "is_granted('PERM', 'activities.manage')"),
+        new Patch(security: "is_granted('PERM', 'activities.manage')"),
+        new Delete(security: "is_granted('PERM', 'activities.manage')"),
     ],
     normalizationContext: ['groups' => ['activity:read']],
     denormalizationContext: ['groups' => ['activity:write']],

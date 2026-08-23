@@ -26,8 +26,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'deal')]
 #[ApiResource(
     operations: [
-        new GetCollection(), new Get(),
-        new Post(), new Patch(),
+        new GetCollection(security: "is_granted('PERM', 'deals.view')"),
+        new Get(security: "is_granted('PERM', 'deals.view')"),
+        new Post(security: "is_granted('PERM', 'deals.manage')"),
+        new Patch(security: "is_granted('PERM', 'deals.manage')"),
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ],
     normalizationContext: ['groups' => ['deal:read']],

@@ -31,7 +31,6 @@ use Symfony\Component\Routing\Attribute\Route;
  * ergaenztes WHERE waere eine zweite Quelle der Wahrheit und genau die
  * Falle, vor der die Mandanten-Architektur schuetzen soll.
  */
-#[IsGranted('IS_AUTHENTICATED_FULLY')]
 final class ExportController extends AbstractController
 {
     private const STATUS_LABEL = [
@@ -62,6 +61,10 @@ final class ExportController extends AbstractController
     )]
     public function export(string $typ, string $format, Request $request): Response
     {
+        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
+        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        $this->denyAccessUnlessGranted('PERM', 'importexport.use');
+
         [$kopf, $zeilen] = match ($typ) {
             'contacts' => $this->kontakteDaten($request),
             'companies' => $this->firmenDaten($request),

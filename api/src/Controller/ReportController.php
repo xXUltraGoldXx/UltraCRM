@@ -15,7 +15,6 @@ use Symfony\Component\Routing\Attribute\Route;
  * Auswertung. Die Abfragen laufen ueber den Mandantenfilter, es kann also
  * niemand versehentlich ueber Mandantengrenzen hinweg summieren.
  */
-#[IsGranted('IS_AUTHENTICATED_FULLY')]
 final class ReportController extends AbstractController
 {
     public function __construct(private readonly EntityManagerInterface $em)
@@ -25,6 +24,10 @@ final class ReportController extends AbstractController
     #[Route('/api/reports/summary', name: 'report_summary', methods: ['GET'])]
     public function summary(): Response
     {
+        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
+        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        $this->denyAccessUnlessGranted('PERM', 'reports.view');
+
         /** @var Deal[] $deals */
         $deals = $this->em->getRepository(Deal::class)->findAll();
         /** @var Contact[] $kontakte */

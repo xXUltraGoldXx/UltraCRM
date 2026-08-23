@@ -37,7 +37,6 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * Request (Context.md, Mandanten-Modell); TenantAssignListener setzt ihn
  * beim Anlegen automatisch.
  */
-#[IsGranted('IS_AUTHENTICATED_FULLY')]
 final class ImportController extends AbstractController
 {
     public function __construct(
@@ -52,6 +51,10 @@ final class ImportController extends AbstractController
     #[Route('/api/import/analyze', name: 'import_analyze', methods: ['POST'])]
     public function analyze(Request $request): Response
     {
+        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
+        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        $this->denyAccessUnlessGranted('PERM', 'importexport.use');
+
         $file = $request->files->get('file');
         if (!$file instanceof UploadedFile) {
             return $this->fehler('Bitte eine Datei auswählen.', 400);
@@ -76,6 +79,10 @@ final class ImportController extends AbstractController
     #[Route('/api/import/execute', name: 'import_execute', methods: ['POST'])]
     public function execute(Request $request): Response
     {
+        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
+        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        $this->denyAccessUnlessGranted('PERM', 'importexport.use');
+
         $file = $request->files->get('file');
         if (!$file instanceof UploadedFile) {
             return $this->fehler('Bitte eine Datei auswählen.', 400);

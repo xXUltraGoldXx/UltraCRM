@@ -33,9 +33,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['confirm_token'], name: 'idx_contact_confirm_token')]
 #[ApiResource(
     operations: [
-        new GetCollection(), new Get(),
-        new Post(processor: ContactProcessor::class),
-        new Patch(processor: ContactProcessor::class),
+        new GetCollection(security: "is_granted('PERM', 'contacts.view')"),
+        new Get(security: "is_granted('PERM', 'contacts.view')"),
+        new Post(security: "is_granted('PERM', 'contacts.manage')", processor: ContactProcessor::class),
+        new Patch(security: "is_granted('PERM', 'contacts.manage')", processor: ContactProcessor::class),
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ],
     normalizationContext: ['groups' => ['contact:read']],

@@ -23,7 +23,6 @@ use Symfony\Component\Routing\Attribute\Route;
  * Mandantenfilter — ein Kontakt eines fremden Mandanten wird gar nicht erst
  * gefunden.
  */
-#[IsGranted('IS_AUTHENTICATED_FULLY')]
 final class PrivacyController extends AbstractController
 {
     public function __construct(
@@ -40,6 +39,8 @@ final class PrivacyController extends AbstractController
     #[Route('/api/privacy/contacts/{id}/export', name: 'privacy_export', methods: ['GET'])]
     public function export(int $id): Response
     {
+        $this->denyAccessUnlessGranted('PERM', 'privacy.view');
+
         $kontakt = $this->em->getRepository(Contact::class)->find($id);
         if ($kontakt === null) {
             return new JsonResponse(['error' => 'Kontakt nicht gefunden.'], 404);
@@ -116,6 +117,8 @@ final class PrivacyController extends AbstractController
     #[Route('/api/privacy/contacts/{id}/erase', name: 'privacy_erase', methods: ['POST'])]
     public function erase(int $id, Request $request): Response
     {
+        $this->denyAccessUnlessGranted('PERM', 'privacy.manage');
+
         $daten = json_decode($request->getContent(), true);
         $grund = trim((string) ($daten['reason'] ?? ''));
         if ($grund === '') {
@@ -169,9 +172,12 @@ final class PrivacyController extends AbstractController
     }
 
     /** Widerruf der Einwilligung — ab sofort keine Werbung mehr. */
+    #[IsGranted('PERM', 'privacy.manage')]
     #[Route('/api/privacy/contacts/{id}/withdraw', name: 'privacy_withdraw', methods: ['POST'])]
     public function withdraw(int $id): Response
     {
+        $this->denyAccessUnlessGranted('PERM', 'privacy.manage');
+
         $kontakt = $this->em->getRepository(Contact::class)->find($id);
         if ($kontakt === null) {
             return new JsonResponse(['error' => 'Kontakt nicht gefunden.'], 404);
@@ -193,6 +199,8 @@ final class PrivacyController extends AbstractController
     #[Route('/api/privacy/due-deletions', name: 'privacy_due', methods: ['GET'])]
     public function dueDeletions(): Response
     {
+        $this->denyAccessUnlessGranted('PERM', 'privacy.view');
+
         $faellig = $this->em->createQuery(
             'SELECT c FROM App\Entity\Contact c WHERE c.deleteAfter IS NOT NULL AND c.deleteAfter <= :heute ORDER BY c.deleteAfter ASC'
         )->setParameter('heute', new \DateTimeImmutable('today'))->getResult();

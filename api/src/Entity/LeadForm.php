@@ -23,8 +23,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'lead_form')]
 #[ApiResource(
     operations: [
-        new GetCollection(), new Get(),
-        new Post(), new Patch(),
+        new GetCollection(security: "is_granted('PERM', 'leadforms.manage')"),
+        new Get(security: "is_granted('PERM', 'leadforms.manage')"),
+        new Post(security: "is_granted('PERM', 'leadforms.manage')"),
+        new Patch(security: "is_granted('PERM', 'leadforms.manage')"),
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ],
     normalizationContext: ['groups' => ['leadform:read']],
