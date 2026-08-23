@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\State\CustomDataProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -28,8 +29,8 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(security: "is_granted('PERM', 'deals.view')"),
         new Get(security: "is_granted('PERM', 'deals.view')"),
-        new Post(security: "is_granted('PERM', 'deals.manage')"),
-        new Patch(security: "is_granted('PERM', 'deals.manage')"),
+        new Post(security: "is_granted('PERM', 'deals.manage')", processor: CustomDataProcessor::class),
+        new Patch(security: "is_granted('PERM', 'deals.manage')", processor: CustomDataProcessor::class),
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ],
     normalizationContext: ['groups' => ['deal:read']],
@@ -103,6 +104,11 @@ class Deal implements TenantOwnedInterface
     #[Groups(['deal:read', 'deal:write'])]
     private ?string $lostReason = null;
 
+    /** Werte der Zusatzfelder, geprueft gegen CustomFieldDefinition. */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?array $customData = null;
+
     #[ORM\Column(nullable: true)]
     #[Groups(['deal:read'])]
     private ?\DateTimeImmutable $closedAt = null;
@@ -165,6 +171,8 @@ class Deal implements TenantOwnedInterface
     public function getExpectedCloseAt(): ?\DateTimeImmutable { return $this->expectedCloseAt; }
     public function setExpectedCloseAt(?\DateTimeImmutable $v): static { $this->expectedCloseAt = $v; return $this; }
     public function getLostReason(): ?string { return $this->lostReason; }
+    public function getCustomData(): ?array { return $this->customData; }
+    public function setCustomData(?array $v): static { $this->customData = $v; return $this; }
     public function setLostReason(?string $v): static { $this->lostReason = $v; return $this; }
     public function getClosedAt(): ?\DateTimeImmutable { return $this->closedAt; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }

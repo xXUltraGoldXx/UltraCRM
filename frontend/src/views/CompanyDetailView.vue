@@ -22,18 +22,22 @@ const firma = ref(null);
 const kontakte = ref([]);
 const vorgaenge = ref([]);
 const verlauf = ref([]);
+const zusatzfelder = ref([]);
 const fehler = ref('');
 
 async function laden() {
     const id = route.params.id;
     const iri = `/api/companies/${id}`;
     try {
-        const [f, k, d, a] = await Promise.all([
+        const [f, k, d, a, z] = await Promise.all([
             api.get(`/companies/${id}`),
             api.get('/contacts', { params: { company: iri } }),
             api.get('/deals', { params: { company: iri } }),
             api.get('/activities', { params: { 'contact.company': iri } }),
+            api.get('/custom_field_definitions', { params: { entityType: 'company' } }),
         ]);
+        zusatzfelder.value = (z.data['hydra:member'] ?? z.data.member ?? [])
+            .filter((x) => x.entityType === 'company');
         firma.value = f.data;
         kontakte.value = k.data['hydra:member'] ?? k.data.member ?? [];
         vorgaenge.value = d.data['hydra:member'] ?? d.data.member ?? [];
@@ -211,6 +215,22 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
                 </UiCard>
             </div>
 
+            <UiCard v-if="zusatzfelder.length">
+                <p class="t-caption">Weitere Angaben</p>
+                <dl class="zusatz">
+                    <template v-for="f in zusatzfelder" :key="f.id">
+                        <dt class="t-footnote">{{ f.label }}</dt>
+                        <dd>
+                            <template v-if="firma.customData?.[f.fieldKey] !== undefined && firma.customData?.[f.fieldKey] !== null">
+                                <template v-if="f.type === 'janein'">{{ firma.customData[f.fieldKey] ? 'Ja' : 'Nein' }}</template>
+                                <template v-else>{{ firma.customData[f.fieldKey] }}</template>
+                            </template>
+                            <span v-else class="muted">—</span>
+                        </dd>
+                    </template>
+                </dl>
+            </UiCard>
+
             <UiCard>
                 <p class="t-caption">Verlauf des gesamten Kunden</p>
                 <div v-if="verlauf.length" class="stack">
@@ -288,6 +308,9 @@ p { margin: 0; }
 .haken input { width: 20px; height: 20px; accent-color: var(--accent); }
 
 .eintrag { border-left: 2px solid var(--separator); padding-left: var(--sp-4); }
+.zusatz { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-3); }
+.zusatz dt { color: var(--label-tertiary); }
+.zusatz dd { margin: 2px 0 0; font-size: var(--text-subhead); }
 .betreff { font-size: var(--text-subhead); font-weight: 600; margin-top: var(--sp-1); }
 
 @media (max-width: 900px) {

@@ -21,6 +21,7 @@ const PHASEN = [
 
 const auth = useAuthStore();
 const deals = ref([]);
+const zusatzfelder = ref([]);
 const laedt = ref(true);
 const fehler = ref('');
 const formOffen = ref(false);
@@ -37,8 +38,13 @@ window.matchMedia('(max-width: 820px)').addEventListener('change', (e) => { istS
 async function laden() {
     laedt.value = true;
     try {
-        const { data } = await api.get('/deals');
-        deals.value = data['hydra:member'] ?? data.member ?? [];
+        const [d, z] = await Promise.all([
+            api.get('/deals'),
+            api.get('/custom_field_definitions', { params: { entityType: 'deal' } }),
+        ]);
+        deals.value = d.data['hydra:member'] ?? d.data.member ?? [];
+        zusatzfelder.value = (z.data['hydra:member'] ?? z.data.member ?? [])
+            .filter((x) => x.entityType === 'deal');
         fehler.value = '';
     } catch (e) {
         fehler.value = 'Die Vorgänge konnten nicht geladen werden.';
@@ -210,6 +216,15 @@ async function schreibe(deal, patch, phase) {
                     <p class="t-footnote">{{ d.value ? geld.format(Number(d.value)) : 'ohne Wert' }}</p>
                     <p v-if="d.company" class="t-footnote muted">{{ d.company.name }}</p>
 
+                    <!-- Zusatzfelder nur zeigen, wenn befuellt — sonst
+                         verstopfen leere Zeilen die Karte. -->
+                    <p v-for="f in zusatzfelder.filter((x) => d.customData?.[x.fieldKey] !== undefined && d.customData?.[x.fieldKey] !== null && d.customData?.[x.fieldKey] !== '')"
+                       :key="f.id" class="t-footnote zusatz">
+                        {{ f.label }}:
+                        <template v-if="f.type === 'janein'">{{ d.customData[f.fieldKey] ? 'ja' : 'nein' }}</template>
+                        <template v-else>{{ d.customData[f.fieldKey] }}</template>
+                    </p>
+
                     <!-- Ziehen geht auf dem Handy nicht zuverlaessig: dort
                          wechselt die Phase ueber eine Auswahl direkt auf der Karte. -->
                     <select v-if="istSchmal" class="phasewechsel" :value="d.stage"
@@ -304,6 +319,7 @@ select {
 .deal:hover { border-color: var(--accent); }
 .deal p { margin: 0; }
 .deal__titel { font-size: var(--text-subhead); font-weight: 600; margin-bottom: 2px; }
+.zusatz { color: var(--label-tertiary); margin-top: 2px; }
 
 .leer { text-align: center; color: var(--label-tertiary); padding: var(--sp-4) 0; }
 

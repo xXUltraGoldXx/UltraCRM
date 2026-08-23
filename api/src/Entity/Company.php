@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\State\CustomDataProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -24,8 +25,8 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(security: "is_granted('PERM', 'contacts.view')"),
         new Get(security: "is_granted('PERM', 'contacts.view')"),
-        new Post(security: "is_granted('PERM', 'contacts.manage')"),
-        new Patch(security: "is_granted('PERM', 'contacts.manage')"),
+        new Post(security: "is_granted('PERM', 'contacts.manage')", processor: CustomDataProcessor::class),
+        new Patch(security: "is_granted('PERM', 'contacts.manage')", processor: CustomDataProcessor::class),
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ],
     normalizationContext: ['groups' => ['company:read']],
@@ -70,6 +71,11 @@ class Company implements TenantOwnedInterface
     #[Groups(['company:read', 'company:write'])]
     private ?string $notes = null;
 
+    /** Werte der Zusatzfelder, geprueft gegen CustomFieldDefinition. */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['company:read', 'company:write'])]
+    private ?array $customData = null;
+
     #[ORM\OneToMany(mappedBy: 'company', targetEntity: Contact::class)]
     private Collection $contacts;
 
@@ -97,6 +103,8 @@ class Company implements TenantOwnedInterface
     public function getWebsite(): ?string { return $this->website; }
     public function setWebsite(?string $v): static { $this->website = $v; return $this; }
     public function getNotes(): ?string { return $this->notes; }
+    public function getCustomData(): ?array { return $this->customData; }
+    public function setCustomData(?array $v): static { $this->customData = $v; return $this; }
     public function setNotes(?string $v): static { $this->notes = $v; return $this; }
     public function getContacts(): Collection { return $this->contacts; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
