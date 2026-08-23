@@ -8,6 +8,8 @@ import PipelineView from '../views/PipelineView.vue';
 import ActivitiesView from '../views/ActivitiesView.vue';
 import LeadFormsView from '../views/LeadFormsView.vue';
 import PrivacyView from '../views/PrivacyView.vue';
+import ReportsView from '../views/ReportsView.vue';
+import TenantsView from '../views/TenantsView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 
 // Platzhalter sind bewusst benannt: sie sagen, was dort entsteht, statt eine
@@ -25,7 +27,8 @@ const routes = [
             { path: 'aktivitaeten', component: ActivitiesView },
             { path: 'formulare', component: LeadFormsView },
             { path: 'einwilligungen', component: PrivacyView },
-            { path: 'mandanten', component: PlaceholderView, props: { titel: 'Mandanten', text: 'Mandantenverwaltung für Superadmins — Oberfläche folgt, die API steht bereits.' } },
+            { path: 'auswertung', component: ReportsView },
+            { path: 'mandanten', component: TenantsView },
         ],
     },
 ];

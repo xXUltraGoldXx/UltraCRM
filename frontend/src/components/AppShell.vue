@@ -26,6 +26,7 @@ const nav = [
     { to: '/aktivitaeten', icon: 'activity', label: 'Aktivitäten' },
     { to: '/formulare', icon: 'search', label: 'Lead-Formulare' },
     { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen' },
+    { to: '/auswertung', icon: 'pipeline', label: 'Auswertung' },
 ];
 
 const title = computed(() => nav.find((n) => n.to === route.path)?.label ?? 'UltraCRM');
