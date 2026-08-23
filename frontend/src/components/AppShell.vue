@@ -27,6 +27,7 @@ const nav = [
     { to: '/aktivitaeten', icon: 'activity', label: 'Aufgaben', tab: true },
     { to: '/formulare', icon: 'search', label: 'Lead-Formulare' },
     { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen' },
+    { to: '/import', icon: 'import', label: 'Import' },
     { to: '/auswertung', icon: 'pipeline', label: 'Auswertung' },
 ];
 

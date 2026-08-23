@@ -29,6 +29,12 @@ final class ImportAnalyzer
     public const IGNORE = 'ignore';
 
     /**
+     * Synonyme, die nur exakt treffen duerfen. Als Teilstring wuerden sie
+     * mehr kaputt machen als helfen ("name" in "Firmenname").
+     */
+    private const ZU_ALLGEMEIN = ['name', 'titel', 'title', 'rolle', 'mail', 'tel'];
+
+    /**
      * Synonyme je Zielfeld (Rohschreibweisen, wie sie in fremden CRM-Exporten
      * vorkommen). Der Vergleich normalisiert beide Seiten (siehe normalize()):
      * klein geschrieben, ohne Sonderzeichen/Leerzeichen.
@@ -36,9 +42,12 @@ final class ImportAnalyzer
     private const SYNONYMS = [
         'firstName' => ['vorname', 'first name', 'firstname', 'given name', 'rufname'],
         'lastName' => ['nachname', 'name', 'last name', 'surname', 'familienname'],
-        'email' => ['e-mail', 'email', 'mail', 'e-mail-adresse', 'mail address', 'emailadresse'],
+        'email' => [
+            'e-mail', 'email', 'mail', 'e-mail-adresse', 'mail-adresse', 'mailadresse',
+            'mail address', 'email address', 'emailadresse', 'e mail', 'kontakt-mail',
+        ],
         'phone' => ['telefon', 'tel', 'phone', 'telefonnummer', 'mobil'],
-        'company' => ['firma', 'unternehmen', 'company', 'organisation', 'account'],
+        'company' => ['firma', 'firmenname', 'unternehmen', 'company', 'company name', 'organisation', 'organization', 'account'],
         'position' => ['position', 'funktion', 'titel', 'job title', 'rolle'],
         'department' => ['abteilung', 'department', 'bereich'],
     ];
@@ -112,7 +121,35 @@ final class ImportAnalyzer
         }
 
         return array_map(
-            fn (string $header) => $lookup[$this->normalize($header)] ?? self::IGNORE,
+            function (string $header) use ($lookup): string {
+                $norm = $this->normalize($header);
+                if (isset($lookup[$norm])) {
+                    return $lookup[$norm];
+                }
+
+                // Zweiter Versuch: Spaltennamen aus Fremdsystemen sind oft
+                // zusammengesetzt ("Kontakt-Mail-Adresse", "Firmenname").
+                // Deshalb zusaetzlich prüfen, ob ein bekanntes Synonym im
+                // Namen steckt — laengste Treffer zuerst, damit "mail" nicht
+                // gewinnt, wo "emailadresse" passt.
+                $kandidaten = array_keys($lookup);
+                usort($kandidaten, static fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+                foreach ($kandidaten as $kandidat) {
+                    // Zu allgemeine Woerter taugen nicht als Teilstring:
+                    // "name" steckt auch in "Firmenname" und haette es
+                    // faelschlich zum Nachnamen gemacht (im Test passiert).
+                    // Eine falsche Zuordnung ist schlimmer als gar keine.
+                    if (in_array($kandidat, self::ZU_ALLGEMEIN, true)) {
+                        continue;
+                    }
+
+                    if (mb_strlen($kandidat) >= 4 && str_contains($norm, $kandidat)) {
+                        return $lookup[$kandidat];
+                    }
+                }
+
+                return self::IGNORE;
+            },
             $headers,
         );
     }

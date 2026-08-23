@@ -11,6 +11,7 @@ import PipelineView from '../views/PipelineView.vue';
 import ActivitiesView from '../views/ActivitiesView.vue';
 import LeadFormsView from '../views/LeadFormsView.vue';
 import PrivacyView from '../views/PrivacyView.vue';
+import ImportView from '../views/ImportView.vue';
 import ReportsView from '../views/ReportsView.vue';
 import TenantsView from '../views/TenantsView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
@@ -33,6 +34,7 @@ const routes = [
             { path: 'aktivitaeten', component: ActivitiesView },
             { path: 'formulare', component: LeadFormsView },
             { path: 'einwilligungen', component: PrivacyView },
+            { path: 'import', component: ImportView },
             { path: 'auswertung', component: ReportsView },
             { path: 'mandanten', component: TenantsView },
         ],
