@@ -6,6 +6,7 @@ use App\Entity\Activity;
 use App\Entity\Contact;
 use App\Entity\LeadAttempt;
 use App\Entity\LeadForm;
+use App\Service\MailerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -36,6 +37,7 @@ final class PublicLeadController extends AbstractPublicController
         private readonly EntityManagerInterface $em,
         private readonly ValidatorInterface $validator,
         private readonly string $appSecret,
+        private readonly MailerFactory $mailer,
     ) {
     }
 
@@ -104,9 +106,88 @@ final class PublicLeadController extends AbstractPublicController
             );
         }
 
+        // Double-Opt-in: nur wenn eine Adresse da ist UND der Mandant einen
+        // Versandweg hinterlegt hat. Ohne Versand bliebe der Kontakt sonst
+        // dauerhaft unbestaetigt und damit unbenutzbar.
+        $setting = $this->mailer->findSetting($form->getTenant());
+        if ($kontakt->getEmail() && $setting !== null) {
+            $token = bin2hex(random_bytes(24));
+            $kontakt->setConfirmToken($token);
+
+            $link = sprintf('https://crm.ultragold.de/api/public/leads/confirm/%s', $token);
+            $fehler = $this->mailer->send(
+                $setting,
+                $kontakt->getEmail(),
+                'Bitte bestätigen Sie Ihre Anfrage',
+                "Guten Tag,\n\nbitte bestätigen Sie mit einem Klick, dass diese Anfrage von Ihnen stammt:\n"
+                . $link . "\n\nWenn Sie das nicht waren, ignorieren Sie diese Nachricht einfach.\n",
+            );
+
+            // Scheitert der Versand, bleibt der Kontakt bestehen — aber ohne
+            // offenen Token, sonst waere er dauerhaft blockiert.
+            if ($fehler !== null) {
+                $kontakt->setConfirmToken(null);
+            }
+        }
+
         $this->em->flush();
 
         return new JsonResponse(['status' => 'ok'], 202);
+    }
+
+    /**
+     * Bestaetigungslink aus der Opt-in-Mail. Bewusst GET: der Empfaenger
+     * klickt in seinem Mailprogramm.
+     */
+    #[Route('/api/public/leads/confirm/{token}', name: 'public_lead_confirm', methods: ['GET'])]
+    public function confirm(string $token): Response
+    {
+        $filters = $this->em->getFilters();
+        $warAn = $filters->isEnabled('tenant_filter');
+        if ($warAn) {
+            $filters->disable('tenant_filter');
+        }
+
+        try {
+            $kontakt = $this->em->getRepository(Contact::class)->findOneBy(['confirmToken' => $token]);
+        } finally {
+            if ($warAn) {
+                $filters->enable('tenant_filter');
+            }
+        }
+
+        if ($kontakt === null) {
+            return new Response($this->seite('Link nicht gültig', 'Dieser Bestätigungslink ist abgelaufen oder wurde bereits benutzt.'), 404, ['Content-Type' => 'text/html; charset=utf-8']);
+        }
+
+        if ($kontakt->getConsentConfirmedAt() === null) {
+            $kontakt->setConsentConfirmedAt(new \DateTimeImmutable());
+        }
+        // Token entwerten — ein Bestaetigungslink gilt genau einmal.
+        $kontakt->setConfirmToken(null);
+        $this->em->flush();
+
+        return new Response($this->seite('Vielen Dank', 'Ihre Anfrage ist bestätigt. Wir melden uns.'), 200, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+
+    /** Schlichte Bestaetigungsseite — kein Framework, keine externen Dateien. */
+    private function seite(string $titel, string $text): string
+    {
+        return sprintf(
+            '<!doctype html><html lang="de"><meta charset="utf-8">'
+            . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<title>%1$s</title>'
+            . '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;'
+            . 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;'
+            . 'background:#f2f2f7;color:#1c1c1e}main{max-width:32rem;padding:2.5rem;text-align:center;'
+            . 'background:#fff;border-radius:22px;box-shadow:0 8px 24px rgba(0,0,0,.06)}'
+            . 'h1{font-size:1.75rem;margin:0 0 .5rem}p{margin:0;color:#3c3c4399}'
+            . '@media(prefers-color-scheme:dark){body{background:#000;color:#f5f5f7}'
+            . 'main{background:#1c1c1e;box-shadow:none}p{color:#ebebf599}}</style>'
+            . '<main><h1>%1$s</h1><p>%2$s</p></main>',
+            htmlspecialchars($titel, \ENT_QUOTES),
+            htmlspecialchars($text, \ENT_QUOTES),
+        );
     }
 
     private function zuVieleVersuche(string $ipHash): bool

@@ -42,7 +42,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(SearchFilter::class, properties: [
     'lastName' => 'ipartial', 'firstName' => 'ipartial',
     'email' => 'ipartial', 'company.name' => 'ipartial', 'status' => 'exact',
-    'source' => 'exact',
+    'source' => 'exact', 'company' => 'exact',
 ])]
 #[ApiFilter(OrderFilter::class, properties: ['lastName', 'createdAt', 'status'])]
 class Contact implements TenantOwnedInterface
@@ -115,6 +115,19 @@ class Contact implements TenantOwnedInterface
     #[Groups(['contact:read', 'contact:write'])]
     private ?\DateTimeImmutable $deleteAfter = null;
 
+    /**
+     * Bestaetigte Einwilligung (Double-Opt-in). Erst wenn der Empfaenger den
+     * Link in der Bestaetigungsmail geklickt hat, ist belegt, dass die
+     * Adresse wirklich ihm gehoert.
+     */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['contact:read'])]
+    private ?\DateTimeImmutable $consentConfirmedAt = null;
+
+    /** Einmal-Token fuer den Bestaetigungslink. */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $confirmToken = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['contact:read', 'contact:write'])]
     private ?string $notes = null;
@@ -135,7 +148,21 @@ class Contact implements TenantOwnedInterface
     #[Groups(['contact:read'])]
     public function isContactable(): bool
     {
-        return $this->consentGivenAt !== null && $this->consentWithdrawnAt === null;
+        if ($this->consentGivenAt === null || $this->consentWithdrawnAt !== null) {
+            return false;
+        }
+
+        // Wurde ein Bestaetigungslink verschickt, zaehlt die Einwilligung erst
+        // nach dem Klick. Kontakte ohne offenen Token (z.B. auf einer Messe
+        // unterschrieben) bleiben unberuehrt.
+        return $this->confirmToken === null || $this->consentConfirmedAt !== null;
+    }
+
+    /** Wartet dieser Kontakt noch auf seine Bestaetigung? */
+    #[Groups(['contact:read'])]
+    public function isAwaitingConfirmation(): bool
+    {
+        return $this->confirmToken !== null && $this->consentConfirmedAt === null;
     }
 
     #[Groups(['contact:read'])]
@@ -170,6 +197,10 @@ class Contact implements TenantOwnedInterface
     public function getConsentWithdrawnAt(): ?\DateTimeImmutable { return $this->consentWithdrawnAt; }
     public function setConsentWithdrawnAt(?\DateTimeImmutable $v): static { $this->consentWithdrawnAt = $v; return $this; }
     public function getDeleteAfter(): ?\DateTimeImmutable { return $this->deleteAfter; }
+    public function getConsentConfirmedAt(): ?\DateTimeImmutable { return $this->consentConfirmedAt; }
+    public function setConsentConfirmedAt(?\DateTimeImmutable $v): static { $this->consentConfirmedAt = $v; return $this; }
+    public function getConfirmToken(): ?string { return $this->confirmToken; }
+    public function setConfirmToken(?string $v): static { $this->confirmToken = $v; return $this; }
     public function setDeleteAfter(?\DateTimeImmutable $v): static { $this->deleteAfter = $v; return $this; }
     public function getNotes(): ?string { return $this->notes; }
     public function setNotes(?string $v): static { $this->notes = $v; return $this; }

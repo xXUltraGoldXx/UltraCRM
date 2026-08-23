@@ -29,3 +29,7 @@ services:
     App\Controller\PrivacyController:
         arguments:
             $appSecret: '%kernel.secret%'
+
+    App\Service\SecretBox:
+        arguments:
+            $appSecret: '%kernel.secret%'

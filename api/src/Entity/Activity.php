@@ -41,7 +41,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     order: ['dueAt' => 'ASC', 'createdAt' => 'DESC'],
     paginationItemsPerPage: 100,
 )]
-#[ApiFilter(SearchFilter::class, properties: ['type' => 'exact', 'contact' => 'exact', 'deal' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['type' => 'exact', 'contact' => 'exact', 'deal' => 'exact', 'contact.company' => 'exact'])]
 #[ApiFilter(BooleanFilter::class, properties: ['done'])]
 #[ApiFilter(DateFilter::class, properties: ['dueAt'])]
 #[ApiFilter(ExistsFilter::class, properties: ['dueAt'])]

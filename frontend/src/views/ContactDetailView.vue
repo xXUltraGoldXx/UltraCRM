@@ -155,7 +155,12 @@ const offeneVorgaenge = computed(() => vorgaenge.value.filter((d) => d.open));
                         <h2 class="t-title-1">{{ kontakt.displayName }}</h2>
                         <p class="t-subhead">
                             {{ kontakt.position || 'ohne Funktion' }}
-                            <template v-if="kontakt.company"> · {{ kontakt.company.name }}</template>
+                            <template v-if="kontakt.company">
+                                ·
+                                <RouterLink :to="`/firmen/${kontakt.company.id}`" class="firmalink">
+                                    {{ kontakt.company.name }}
+                                </RouterLink>
+                            </template>
                         </p>
                     </div>
                     <div class="spacer" />
@@ -296,6 +301,7 @@ p { margin: 0; }
     min-height: 40px;
 }
 .aktionen { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.firmalink { font-weight: 600; }
 
 .status { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .statusknopf {

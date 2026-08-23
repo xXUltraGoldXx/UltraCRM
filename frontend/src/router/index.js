@@ -5,6 +5,7 @@ import LoginView from '../views/LoginView.vue';
 import OverviewView from '../views/OverviewView.vue';
 import ContactsView from '../views/ContactsView.vue';
 import ContactDetailView from '../views/ContactDetailView.vue';
+import CompanyDetailView from '../views/CompanyDetailView.vue';
 import PipelineView from '../views/PipelineView.vue';
 import ActivitiesView from '../views/ActivitiesView.vue';
 import LeadFormsView from '../views/LeadFormsView.vue';
@@ -25,6 +26,7 @@ const routes = [
             { path: '', component: OverviewView },
             { path: 'kontakte', component: ContactsView },
             { path: 'kontakte/:id', component: ContactDetailView },
+            { path: 'firmen/:id', component: CompanyDetailView },
             { path: 'pipeline', component: PipelineView },
             { path: 'aktivitaeten', component: ActivitiesView },
             { path: 'formulare', component: LeadFormsView },
