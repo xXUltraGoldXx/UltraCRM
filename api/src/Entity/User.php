@@ -84,6 +84,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write'])]
     private bool $active = true;
 
+    /**
+     * Mandant des Users. NULL ist ausschliesslich fuer Superadmins zulaessig
+     * (die stehen ueber den Mandanten); jeder normale User gehoert zu genau
+     * einem Mandanten, sonst sieht er durch den tenant_filter nichts.
+     */
+    #[ORM\ManyToOne(targetEntity: Tenant::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    private ?Tenant $tenant = null;
+
+    public function getTenant(): ?Tenant
+    {
+        return $this->tenant;
+    }
+
+    public function setTenant(?Tenant $tenant): static
+    {
+        $this->tenant = $tenant;
+        return $this;
+    }
+
     /** Modul #9 Urlaubsverwaltung: Kalenderjahr (1.1.-31.12.), ENTSCHIEDEN Default 30. */
     #[ORM\Column]
     #[Groups(['user:read', 'user:write'])]

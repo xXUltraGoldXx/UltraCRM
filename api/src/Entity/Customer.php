@@ -52,8 +52,28 @@ use Symfony\Component\Validator\Constraints as Assert;
     'location' => 'ipartial',
 ])]
 #[ApiFilter(OrderFilter::class, properties: ['company', 'city', 'createdAt'])]
-class Customer
+class Customer implements TenantOwnedInterface
 {
+    /**
+     * Mandanten-Bindung (Paket 2). Kein Serialisierungs-Group: der Mandant
+     * kommt NIE aus dem Request (TenantAssignListener) und wird auch nicht
+     * ausgeliefert.
+     */
+    #[ORM\ManyToOne(targetEntity: Tenant::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    private ?Tenant $tenant = null;
+
+    public function getTenant(): ?Tenant
+    {
+        return $this->tenant;
+    }
+
+    public function setTenant(?Tenant $tenant): static
+    {
+        $this->tenant = $tenant;
+        return $this;
+    }
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
