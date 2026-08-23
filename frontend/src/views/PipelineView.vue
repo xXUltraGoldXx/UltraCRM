@@ -7,6 +7,7 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSegmented from '../components/ui/UiSegmented.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
+import { geld } from '../format.js';
 
 const PHASEN = [
     { key: 'neu', label: 'Neu' },
@@ -30,8 +31,6 @@ const ziehtId = ref(null);
 const mobilPhase = ref('neu');
 const istSchmal = ref(window.matchMedia('(max-width: 820px)').matches);
 window.matchMedia('(max-width: 820px)').addEventListener('change', (e) => { istSchmal.value = e.matches; });
-
-const geld = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
 async function laden() {
     laedt.value = true;

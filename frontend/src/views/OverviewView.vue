@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import api from '../api';
 import UiCard from '../components/ui/UiCard.vue';
 import UiSegmented from '../components/ui/UiSegmented.vue';
+import { geldOhneDezimal as geld } from '../format.js';
 
 const zeitraum = ref('30');
 const kontakte = ref(null);
@@ -10,8 +11,6 @@ const offeneDeals = ref(null);
 const offenerWert = ref(null);
 const faellig = ref(null);
 const fehler = ref('');
-
-const geld = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 const anzahl = (d) => d['hydra:totalItems'] ?? d.totalItems ?? 0;
 
 onMounted(async () => {
@@ -47,7 +46,7 @@ onMounted(async () => {
             ]" />
         </header>
 
-        <div class="grid">
+        <div class="grid kennzahl-grid">
             <UiCard>
                 <p class="t-caption">Kontakte</p>
                 <p class="t-large-title num">{{ kontakte ?? '–' }}</p>
@@ -74,27 +73,11 @@ onMounted(async () => {
 <style scoped>
 .head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; }
 .head p { margin: var(--sp-1) 0 0; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--sp-4); }
 .num { margin: var(--sp-2) 0 var(--sp-1); font-variant-numeric: tabular-nums; }
 .t-caption { margin: 0; }
 
 @media (max-width: 700px) {
     .head { flex-direction: column; align-items: stretch; }
     .head :deep(.seg) { display: grid; grid-template-columns: repeat(3, 1fr); }
-
-    /* Auf Handy-Höhe zählt jede Zeile: Kennzahl und Beschriftung stehen
-       nebeneinander statt in einer hohen Karte untereinander. */
-    .grid { grid-template-columns: 1fr; gap: var(--sp-2); }
-    .grid :deep(.card) {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        row-gap: 2px;
-        padding: var(--sp-4);
-    }
-    .grid :deep(.card) .t-caption { grid-column: 1; margin: 0; }
-    .grid :deep(.card) .num { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: var(--text-title-1); }
-    .grid :deep(.card) .t-footnote { grid-column: 1; }
-
 }
 </style>

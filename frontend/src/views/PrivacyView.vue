@@ -7,14 +7,13 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
+import { datum } from '../format.js';
 
 const kontakte = ref([]);
 const protokoll = ref([]);
 const faellig = ref([]);
 const fehler = ref('');
 const hinweis = ref('');
-
-const datum = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
 
 async function laden() {
     try {

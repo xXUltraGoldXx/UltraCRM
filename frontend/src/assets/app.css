@@ -58,6 +58,7 @@
     --nav-blur: saturate(180%) blur(20px);
     --nav-bg: rgba(255, 255, 255, 0.72);
     --shadow-card: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+    --overlay-scrim: rgba(0,0,0,.45);
 }
 
 /* --- Farben: Dark (kraeftig, hoher Kontrast) -------------------------- */
@@ -83,6 +84,7 @@
 
     --nav-bg: rgba(20, 20, 22, 0.72);
     --shadow-card: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+    --overlay-scrim: rgba(0,0,0,.6);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -140,3 +142,29 @@ a:hover { text-decoration: underline; }
 .row { display: flex; align-items: center; gap: var(--sp-3); }
 .spacer { flex: 1; }
 .muted { color: var(--label-secondary); }
+
+.fehler { color: var(--danger); }
+.ok { color: var(--success); }
+.tight { gap: 2px; }
+.zurueck { align-self: flex-start; }
+.drehen { transform: rotate(180deg); }
+
+.kennzahl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--sp-4); }
+
+@media (max-width: 700px) {
+    .kennzahl-grid { grid-template-columns: 1fr; gap: var(--sp-2); }
+    /* Hier steht bewusst KEIN :deep() — das ist Vue-Syntax fuer scoped
+       styles einer Komponente. In dieser globalen Datei ist es ungueltiges
+       CSS, der Browser verwirft die Regel stillschweigend (im Test genau so
+       passiert: die Karten blieben auf dem Handy hoch). */
+    .kennzahl-grid .card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        row-gap: 2px;
+        padding: var(--sp-4);
+    }
+    .kennzahl-grid .card .t-caption { grid-column: 1; margin: 0; }
+    .kennzahl-grid .card .num { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: var(--text-title-1); }
+    .kennzahl-grid .card .t-footnote { grid-column: 1; }
+}

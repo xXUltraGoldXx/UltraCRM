@@ -7,8 +7,8 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSegmented from '../components/ui/UiSegmented.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
-
-const ART = { anruf: 'Anruf', notiz: 'Notiz', aufgabe: 'Aufgabe', email: 'E-Mail', termin: 'Termin' };
+import { ART } from '../labels.js';
+import { datumZeile } from '../format.js';
 
 const eintraege = ref([]);
 const laedt = ref(true);
@@ -20,7 +20,7 @@ const formFehler = ref('');
 const leer = () => ({ type: 'aufgabe', subject: '', body: '', dueAt: '' });
 const entwurf = ref(leer());
 
-const datum = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const datum = datumZeile;
 
 async function laden() {
     laedt.value = true;

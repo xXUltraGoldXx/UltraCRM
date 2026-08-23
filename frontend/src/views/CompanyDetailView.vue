@@ -8,13 +8,13 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
+import { ART, PHASE } from '../labels.js';
+import { datum, geld } from '../format.js';
 
 /**
  * Kundenakte einer Firma: alles, was zu diesem Kunden gehört, auf einer
  * Seite — Personen, Vorgänge, Verlauf, Kennzahlen.
  */
-const ART = { anruf: 'Anruf', notiz: 'Notiz', aufgabe: 'Aufgabe', email: 'E-Mail', termin: 'Termin' };
-const PHASE = { neu: 'Neu', qualifiziert: 'Qualifiziert', angebot: 'Angebot', verhandlung: 'Verhandlung', gewonnen: 'Gewonnen', verloren: 'Verloren' };
 
 const route = useRoute();
 const router = useRouter();
@@ -23,9 +23,6 @@ const kontakte = ref([]);
 const vorgaenge = ref([]);
 const verlauf = ref([]);
 const fehler = ref('');
-
-const geld = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
-const datum = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
 
 async function laden() {
     const id = route.params.id;
@@ -140,7 +137,7 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
                     </div>
                     <div class="spacer" />
                     <a v-if="firma.website" :href="firma.website" target="_blank" rel="noopener" class="weg">
-                        <Icon name="search" :size="17" /> Website
+                        <Icon name="globe" :size="17" /> Website
                     </a>
                 </div>
             </UiCard>
@@ -189,9 +186,8 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
                                 </RouterLink>
                                 <span class="spacer" />
                                 <button v-if="!k.primaryContact" class="markieren t-footnote"
-                                        title="Als Hauptkontakt festlegen"
                                         @click="alsHauptansprechpartner(k)">
-                                    Hauptkontakt
+                                    Zum Hauptkontakt machen
                                 </button>
                             </div>
                         </div>
@@ -254,10 +250,6 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
 </template>
 
 <style scoped>
-.zurueck { align-self: flex-start; }
-.drehen { transform: rotate(180deg); }
-.fehler { color: var(--danger); }
-.tight { gap: 2px; }
 p { margin: 0; }
 .t-caption { margin: 0 0 var(--sp-3); }
 

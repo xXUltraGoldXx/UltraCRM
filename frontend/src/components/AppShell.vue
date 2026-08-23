@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import Icon from './Icon.vue';
+import UiSheet from './ui/UiSheet.vue';
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -106,29 +107,23 @@ function logout() {
             </nav>
         </div>
 
-        <!-- Mehr-Menü als Blatt von unten -->
-        <Teleport to="body">
-            <Transition name="mehr">
-                <div v-if="mehrOffen" class="mehr-huelle" @click.self="mehrOffen = false">
-                    <div class="mehr">
-                        <div class="griff" />
-                        <RouterLink v-for="w in weitere" :key="w.to" :to="w.to" class="mehr__link" @click="mehrOffen = false">
-                            <Icon :name="w.icon" :size="20" /><span>{{ w.label }}</span>
-                        </RouterLink>
-                        <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="mehr__link" @click="mehrOffen = false">
-                            <Icon name="building" :size="20" /><span>Mandanten</span>
-                        </RouterLink>
-                        <button class="mehr__link" @click="toggleTheme">
-                            <Icon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
-                            <span>{{ theme === 'dark' ? 'Helles Erscheinungsbild' : 'Dunkles Erscheinungsbild' }}</span>
-                        </button>
-                        <button class="mehr__link mehr__link--weg" @click="logout">
-                            <Icon name="logout" :size="20" /><span>Abmelden</span>
-                        </button>
-                    </div>
-                </div>
-            </Transition>
-        </Teleport>
+        <!-- Mehr-Menü: nutzt dasselbe Blatt wie alle anderen Dialoge -->
+        <UiSheet :offen="mehrOffen" ohneAktionen @schliessen="mehrOffen = false">
+            <RouterLink v-for="w in weitere" :key="w.to" :to="w.to" class="mehr__link" @click="mehrOffen = false">
+                <Icon :name="w.icon" :size="20" /><span>{{ w.label }}</span>
+            </RouterLink>
+            <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="mehr__link" @click="mehrOffen = false">
+                <Icon name="building" :size="20" /><span>Mandanten</span>
+            </RouterLink>
+            <button class="mehr__link" @click="toggleTheme">
+                <Icon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
+                <span>{{ theme === 'dark' ? 'Helles Erscheinungsbild' : 'Dunkles Erscheinungsbild' }}</span>
+            </button>
+            <button class="mehr__link mehr__link--weg" @click="logout">
+                <Icon name="logout" :size="20" /><span>Abmelden</span>
+            </button>
+        </UiSheet>
+
     </div>
 </template>
 
@@ -246,23 +241,6 @@ nav { display: flex; flex-direction: column; gap: 2px; }
     .tab.router-link-exact-active, .tab.aktiv { color: var(--accent); }
 }
 
-.mehr-huelle {
-    position: fixed; inset: 0; z-index: 90;
-    display: flex; align-items: flex-end;
-    background: rgba(0,0,0,.45);
-    backdrop-filter: blur(3px);
-}
-.mehr {
-    width: 100%;
-    background: var(--bg-elevated);
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    padding: var(--sp-3) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom));
-    display: flex; flex-direction: column; gap: 2px;
-}
-.mehr .griff {
-    width: 38px; height: 5px; border-radius: var(--radius-pill);
-    background: var(--fill-tertiary); margin: 0 auto var(--sp-3);
-}
 .mehr__link {
     display: flex; align-items: center; gap: var(--sp-4);
     min-height: 52px; padding: 0 var(--sp-3);
@@ -275,8 +253,4 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 .mehr__link:active { background: var(--fill-quaternary); }
 .mehr__link--weg { color: var(--danger); }
 
-.mehr-enter-active, .mehr-leave-active { transition: opacity .2s ease; }
-.mehr-enter-active .mehr, .mehr-leave-active .mehr { transition: transform .24s cubic-bezier(.32,.72,0,1); }
-.mehr-enter-from, .mehr-leave-to { opacity: 0; }
-.mehr-enter-from .mehr, .mehr-leave-to .mehr { transform: translateY(100%); }
 </style>

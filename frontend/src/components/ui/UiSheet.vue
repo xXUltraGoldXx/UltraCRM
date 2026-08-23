@@ -15,6 +15,13 @@ const props = defineProps({
     bestaetigen: { type: String, default: 'Bestätigen' },
     ton: { type: String, default: 'primary' }, // primary | danger
     laeuft: Boolean,
+    /**
+     * Ohne Bestaetigen/Abbrechen — fuer Blaetter, die nur Inhalt zeigen
+     * (z.B. ein Menue). Vorher gab es dafuer einen zweiten Nachbau in
+     * AppShell.vue mit derselben Huelle, demselben Griff und denselben
+     * Uebergangszeiten (Review-Befund, Schwere 35).
+     */
+    ohneAktionen: Boolean,
 });
 const emit = defineEmits(['schliessen', 'bestaetigen']);
 
@@ -41,7 +48,7 @@ watch(() => props.offen, (o) => { document.body.style.overflow = o ? 'hidden' : 
 
                     <div class="inhalt"><slot /></div>
 
-                    <div class="aktionen">
+                    <div v-if="!ohneAktionen" class="aktionen">
                         <UiButton @click="emit('schliessen')">Abbrechen</UiButton>
                         <UiButton :variant="ton" :disabled="laeuft" @click="emit('bestaetigen')">
                             {{ laeuft ? 'Einen Moment…' : bestaetigen }}
@@ -57,7 +64,7 @@ watch(() => props.offen, (o) => { document.body.style.overflow = o ? 'hidden' : 
 .huelle {
     position: fixed; inset: 0; z-index: 100;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(0, 0, 0, .45);
+    background: var(--overlay-scrim);
     backdrop-filter: blur(3px);
     padding: var(--sp-4);
 }

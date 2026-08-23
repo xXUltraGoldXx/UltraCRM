@@ -7,16 +7,7 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSegmented from '../components/ui/UiSegmented.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
-
-const STATUS_LABEL = {
-    neu: 'Neu', in_kontakt: 'In Kontakt', qualifiziert: 'Qualifiziert',
-    kunde: 'Kunde', kein_interesse: 'Kein Interesse',
-};
-const QUELLE_LABEL = {
-    formular: 'Formular', telefon: 'Telefon', messe: 'Messe',
-    empfehlung: 'Empfehlung', eigene_recherche: 'Recherche',
-    import: 'Import', sonstiges: 'Sonstiges',
-};
+import { STATUS_LABEL, QUELLE_LABEL } from '../labels.js';
 
 const kontakte = ref([]);
 const laedt = ref(true);

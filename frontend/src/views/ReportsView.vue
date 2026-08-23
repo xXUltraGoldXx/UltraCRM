@@ -2,13 +2,11 @@
 import { computed, onMounted, ref } from 'vue';
 import api from '../api';
 import UiCard from '../components/ui/UiCard.vue';
-
-const PHASE = { neu: 'Neu', qualifiziert: 'Qualifiziert', angebot: 'Angebot', verhandlung: 'Verhandlung', gewonnen: 'Gewonnen', verloren: 'Verloren' };
-const QUELLE = { formular: 'Formular', telefon: 'Telefon', messe: 'Messe', empfehlung: 'Empfehlung', eigene_recherche: 'Recherche', import: 'Import', sonstiges: 'Sonstiges' };
+import { PHASE, QUELLE } from '../labels.js';
+import { geldOhneDezimal as geld } from '../format.js';
 
 const bericht = ref(null);
 const fehler = ref('');
-const geld = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
 onMounted(async () => {
     try {
@@ -34,7 +32,7 @@ const maxQuelle = computed(() => Math.max(1, ...(bericht.value?.quellen ?? []).m
         <p v-if="fehler" class="t-footnote fehler">{{ fehler }}</p>
 
         <template v-if="bericht">
-            <div class="grid">
+            <div class="grid kennzahl-grid">
                 <UiCard>
                     <p class="t-caption">Offener Pipeline-Wert</p>
                     <p class="t-large-title num">{{ geld.format(bericht.kennzahlen.offenerWert) }}</p>
@@ -82,8 +80,6 @@ const maxQuelle = computed(() => Math.max(1, ...(bericht.value?.quellen ?? []).m
 
 <style scoped>
 header p { margin: var(--sp-1) 0 0; }
-.fehler { color: var(--danger); }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--sp-4); }
 .num { margin: var(--sp-2) 0 var(--sp-1); font-variant-numeric: tabular-nums; }
 .t-caption { margin: 0 0 var(--sp-4); }
 p { margin: 0; }
@@ -102,20 +98,4 @@ p { margin: 0; }
 .wert { text-align: right; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 700px) { .zeile { grid-template-columns: 100px 1fr 90px; } }
-
-@media (max-width: 700px) {
-    .grid { grid-template-columns: 1fr; gap: var(--sp-2); }
-    /* Auf Handy-Hoehe zaehlt jede Zeile: Kennzahl und Beschriftung stehen
-       nebeneinander statt in einer hohen Karte untereinander. */
-    .grid :deep(.card) {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        row-gap: 2px;
-        padding: var(--sp-4);
-    }
-    .grid :deep(.card) .t-caption { grid-column: 1; margin: 0; }
-    .grid :deep(.card) .num { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: var(--text-title-1); }
-    .grid :deep(.card) .t-footnote { grid-column: 1; }
-}
 </style>

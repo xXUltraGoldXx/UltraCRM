@@ -8,10 +8,8 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
-
-const STATUS = { neu: 'Neu', in_kontakt: 'In Kontakt', qualifiziert: 'Qualifiziert', kunde: 'Kunde', kein_interesse: 'Kein Interesse' };
-const QUELLE = { formular: 'Formular', telefon: 'Telefon', messe: 'Messe', empfehlung: 'Empfehlung', eigene_recherche: 'Recherche', import: 'Import', sonstiges: 'Sonstiges' };
-const ART = { anruf: 'Anruf', notiz: 'Notiz', aufgabe: 'Aufgabe', email: 'E-Mail', termin: 'Termin' };
+import { ART, STATUS, QUELLE } from '../labels.js';
+import { datum, geld } from '../format.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -21,9 +19,6 @@ const vorgaenge = ref([]);
 const fehler = ref('');
 const hinweis = ref('');
 const laedt = ref(true);
-
-const datum = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
-const geld = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
 async function laden() {
     laedt.value = true;
@@ -171,7 +166,7 @@ const offeneVorgaenge = computed(() => vorgaenge.value.filter((d) => d.open));
 
                 <div class="kontaktwege">
                     <a v-if="kontakt.email" :href="`mailto:${kontakt.email}`" class="weg">
-                        <Icon name="activity" :size="17" /> {{ kontakt.email }}
+                        <Icon name="mail" :size="17" /> {{ kontakt.email }}
                     </a>
                     <a v-if="kontakt.phone" :href="`tel:${kontakt.phone}`" class="weg">
                         <Icon name="contacts" :size="17" /> {{ kontakt.phone }}
@@ -284,11 +279,6 @@ const offeneVorgaenge = computed(() => vorgaenge.value.filter((d) => d.open));
 </template>
 
 <style scoped>
-.zurueck { align-self: flex-start; }
-.drehen { transform: rotate(180deg); }
-.fehler { color: var(--danger); }
-.ok { color: var(--success); }
-.tight { gap: 2px; }
 p { margin: 0; }
 .t-caption { margin: 0 0 var(--sp-3); }
 
