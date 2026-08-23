@@ -7,6 +7,7 @@ import ContactsView from '../views/ContactsView.vue';
 import PipelineView from '../views/PipelineView.vue';
 import ActivitiesView from '../views/ActivitiesView.vue';
 import LeadFormsView from '../views/LeadFormsView.vue';
+import PrivacyView from '../views/PrivacyView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 
 // Platzhalter sind bewusst benannt: sie sagen, was dort entsteht, statt eine
@@ -23,7 +24,7 @@ const routes = [
             { path: 'pipeline', component: PipelineView },
             { path: 'aktivitaeten', component: ActivitiesView },
             { path: 'formulare', component: LeadFormsView },
-            { path: 'einwilligungen', component: PlaceholderView, props: { titel: 'Einwilligungen', text: 'Auskunft, Löschung und Einwilligungs-Historie nach DSGVO — in Arbeit (Paket 7).' } },
+            { path: 'einwilligungen', component: PrivacyView },
             { path: 'mandanten', component: PlaceholderView, props: { titel: 'Mandanten', text: 'Mandantenverwaltung für Superadmins — Oberfläche folgt, die API steht bereits.' } },
         ],
     },

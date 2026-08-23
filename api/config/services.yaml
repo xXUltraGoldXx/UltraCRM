@@ -25,3 +25,7 @@ services:
     App\Controller\PublicLeadController:
         arguments:
             $appSecret: '%kernel.secret%'
+
+    App\Controller\PrivacyController:
+        arguments:
+            $appSecret: '%kernel.secret%'
