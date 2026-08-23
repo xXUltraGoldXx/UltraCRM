@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import api from '../api';
+import { useAuthStore } from '../stores/auth';
 import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
@@ -18,6 +19,7 @@ const PHASEN = [
     { key: 'verloren', label: 'Verloren' },
 ];
 
+const auth = useAuthStore();
 const deals = ref([]);
 const laedt = ref(true);
 const fehler = ref('');
@@ -156,7 +158,7 @@ async function schreibe(deal, patch, phase) {
                 <p class="t-subhead">{{ offeneSumme }} in offenen Vorgängen</p>
             </div>
             <div class="row head__aktionen">
-                <div class="export">
+                <div v-if="auth.darf('importexport.use')" class="export">
                     <UiButton variant="quiet" size="sm" :disabled="exportLaeuft" @click="exportOffen = !exportOffen">
                         {{ exportLaeuft ? 'Wird erstellt…' : 'Exportieren' }}
                     </UiButton>
@@ -165,7 +167,7 @@ async function schreibe(deal, patch, phase) {
                         <button type="button" @click="exportieren('xlsx')">Als Excel</button>
                     </div>
                 </div>
-                <UiButton variant="primary" @click="formOffen = !formOffen">
+                <UiButton variant="primary" v-if="auth.darf('deals.manage')" @click="formOffen = !formOffen">
                     <Icon name="plus" :size="16" /> Vorgang anlegen
                 </UiButton>
             </div>

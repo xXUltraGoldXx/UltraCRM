@@ -1,12 +1,14 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue';
 import api from '../api';
+import { useAuthStore } from '../stores/auth';
 import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
 
+const auth = useAuthStore();
 const firmen = ref([]);
 const zaehler = ref({});   // firmaId -> Anzahl Personen
 const suche = ref('');
@@ -89,7 +91,7 @@ async function speichern() {
                 <h2 class="t-large-title">Firmen</h2>
                 <p class="t-subhead">{{ firmen.length }} {{ firmen.length === 1 ? 'Firma' : 'Firmen' }}</p>
             </div>
-            <UiButton variant="primary" @click="anlegen = true">
+            <UiButton variant="primary" v-if="auth.darf('contacts.manage')" @click="anlegen = true">
                 <Icon name="plus" :size="16" /> Firma anlegen
             </UiButton>
         </header>
@@ -100,7 +102,7 @@ async function speichern() {
                 <input v-model="suche" type="search" placeholder="Firma suchen" />
             </label>
 
-            <div class="export">
+            <div v-if="auth.darf('importexport.use')" class="export">
                 <UiButton variant="quiet" size="sm" :disabled="exportLaeuft" @click="exportOffen = !exportOffen">
                     {{ exportLaeuft ? 'Wird erstellt…' : 'Exportieren' }}
                 </UiButton>

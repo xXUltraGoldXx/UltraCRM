@@ -20,25 +20,30 @@ function toggleTheme() {
 }
 onMounted(applyTheme);
 
-const nav = [
+// Jeder Eintrag nennt das Recht, das ihn sichtbar macht. Fehlt es, wird er
+// ausgeblendet — sonst klickt ein Mitarbeiter auf Menuepunkte, die ihm
+// anschliessend 403 liefern. Die Uebersicht bleibt fuer alle sichtbar.
+const alleNav = [
     { to: '/', icon: 'overview', label: 'Übersicht', tab: true },
-    { to: '/kontakte', icon: 'contacts', label: 'Kontakte', tab: true },
-    { to: '/firmen', icon: 'building', label: 'Firmen' },
-    { to: '/pipeline', icon: 'pipeline', label: 'Pipeline', tab: true },
-    { to: '/aktivitaeten', icon: 'activity', label: 'Aufgaben', tab: true },
-    { to: '/formulare', icon: 'search', label: 'Lead-Formulare' },
-    { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen' },
-    { to: '/import', icon: 'import', label: 'Import' },
-    { to: '/auswertung', icon: 'pipeline', label: 'Auswertung' },
+    { to: '/kontakte', icon: 'contacts', label: 'Kontakte', tab: true, recht: 'contacts.view' },
+    { to: '/firmen', icon: 'building', label: 'Firmen', recht: 'contacts.view' },
+    { to: '/pipeline', icon: 'pipeline', label: 'Pipeline', tab: true, recht: 'deals.view' },
+    { to: '/aktivitaeten', icon: 'activity', label: 'Aufgaben', tab: true, recht: 'activities.view' },
+    { to: '/formulare', icon: 'search', label: 'Lead-Formulare', recht: 'leadforms.manage' },
+    { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen', recht: 'privacy.view' },
+    { to: '/import', icon: 'import', label: 'Import', recht: 'importexport.use' },
+    { to: '/auswertung', icon: 'pipeline', label: 'Auswertung', recht: 'reports.view' },
 ];
+
+const nav = computed(() => alleNav.filter((n) => !n.recht || auth.darf(n.recht)));
 
 // Auf dem Handy passen vier Ziele in die Leiste; alles Weitere liegt hinter
 // "Mehr". Mehr als fuenf Tabs sind auf Daumenbreite nicht mehr treffsicher.
-const tabs = nav.filter((n) => n.tab);
-const weitere = nav.filter((n) => !n.tab);
+const tabs = computed(() => nav.value.filter((n) => n.tab));
+const weitere = computed(() => nav.value.filter((n) => !n.tab));
 const mehrOffen = ref(false);
 
-const title = computed(() => nav.find((n) => n.to === route.path)?.label ?? 'UltraCRM');
+const title = computed(() => nav.value.find((n) => n.to === route.path)?.label ?? 'UltraCRM');
 const initials = computed(() => (auth.user?.displayName || auth.user?.username || '?')
     .split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase());
 

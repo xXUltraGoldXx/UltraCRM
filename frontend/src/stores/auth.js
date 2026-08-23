@@ -29,11 +29,29 @@ export const useAuthStore = defineStore('auth', {
             this.user = null;
             localStorage.removeItem('crm-token');
         },
-        // Prüft, ob der aktuelle Nutzer mindestens eines der Rechte hat (Admin = immer true)
-        can(...keys) {
-            if (this.isAdmin) return true;
-            const mine = this.user?.permissions || [];
-            return keys.some((k) => mine.includes(k));
+        /**
+         * Darf der angemeldete Benutzer das? Bildet die Regel der API nach:
+         * Admins duerfen alles, und wer aendern darf, darf auch ansehen.
+         *
+         * Wichtig: Das hier ist nur fuer die Anzeige. Die verbindliche
+         * Pruefung steht im PermissionVoter auf dem Server — das Frontend
+         * blendet nur aus, was ohnehin 403 liefern wuerde.
+         */
+        darf(recht) {
+            if (this.isAdmin || this.isSuperadmin) return true;
+
+            const meine = this.user?.permissions || [];
+            if (meine.includes(recht)) return true;
+
+            // manage schliesst view ein — dieselbe Zuordnung wie serverseitig.
+            const einschluss = {
+                'contacts.view': 'contacts.manage',
+                'deals.view': 'deals.manage',
+                'activities.view': 'activities.manage',
+                'privacy.view': 'privacy.manage',
+            };
+
+            return einschluss[recht] ? meine.includes(einschluss[recht]) : false;
         },
     },
 });

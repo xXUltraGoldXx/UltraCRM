@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import api from '../api';
+import { useAuthStore } from '../stores/auth';
 import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
@@ -10,6 +11,7 @@ import UiBadge from '../components/ui/UiBadge.vue';
 import { ART } from '../labels.js';
 import { datumZeile } from '../format.js';
 
+const auth = useAuthStore();
 const eintraege = ref([]);
 const laedt = ref(true);
 const fehler = ref('');
@@ -83,7 +85,7 @@ const ueberfaellig = computed(() => eintraege.value.filter((a) => a.overdue).len
                     <template v-else>Nichts überfällig</template>
                 </p>
             </div>
-            <UiButton variant="primary" @click="formOffen = !formOffen">
+            <UiButton variant="primary" v-if="auth.darf('activities.manage')" @click="formOffen = !formOffen">
                 <Icon name="plus" :size="16" /> Eintrag anlegen
             </UiButton>
         </header>

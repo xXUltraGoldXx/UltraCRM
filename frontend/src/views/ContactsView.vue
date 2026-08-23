@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import api from '../api';
+import { useAuthStore } from '../stores/auth';
 import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
@@ -9,6 +10,7 @@ import UiSegmented from '../components/ui/UiSegmented.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
 import { STATUS_LABEL, QUELLE_LABEL } from '../labels.js';
 
+const auth = useAuthStore();
 const kontakte = ref([]);
 const laedt = ref(true);
 const fehler = ref('');
@@ -105,7 +107,7 @@ const anzahl = computed(() => kontakte.value.length);
                 <h2 class="t-large-title">Kontakte</h2>
                 <p class="t-subhead">{{ anzahl }} {{ anzahl === 1 ? 'Eintrag' : 'Einträge' }}</p>
             </div>
-            <UiButton variant="primary" @click="formOffen = !formOffen">
+            <UiButton variant="primary" v-if="auth.darf('contacts.manage')" @click="formOffen = !formOffen">
                 <Icon name="plus" :size="16" /> Kontakt anlegen
             </UiButton>
         </header>
@@ -156,7 +158,7 @@ const anzahl = computed(() => kontakte.value.length);
                 { value: 'kunde', label: 'Kunden' },
             ]" />
 
-            <div class="export">
+            <div v-if="auth.darf('importexport.use')" class="export">
                 <UiButton variant="quiet" size="sm" :disabled="exportLaeuft" @click="exportOffen = !exportOffen">
                     {{ exportLaeuft ? 'Wird erstellt…' : 'Exportieren' }}
                 </UiButton>
