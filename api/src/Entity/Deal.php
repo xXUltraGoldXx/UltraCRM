@@ -35,7 +35,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     order: ['position' => 'ASC', 'createdAt' => 'DESC'],
     paginationItemsPerPage: 200,
 )]
-#[ApiFilter(SearchFilter::class, properties: ['stage' => 'exact', 'title' => 'ipartial'])]
+#[ApiFilter(SearchFilter::class, properties: ['stage' => 'exact', 'title' => 'ipartial', 'contact' => 'exact', 'company' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt', 'value', 'expectedCloseAt'])]
 class Deal implements TenantOwnedInterface
 {

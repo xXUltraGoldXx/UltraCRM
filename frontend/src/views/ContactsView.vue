@@ -154,7 +154,8 @@ const anzahl = computed(() => kontakte.value.length);
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="k in kontakte" :key="k.id">
+                    <tr v-for="k in kontakte" :key="k.id" class="klickbar"
+                        @click="$router.push(`/kontakte/${k.id}`)">
                         <td>
                             <span class="name">{{ k.displayName }}</span>
                             <span class="t-footnote">{{ k.email || k.phone || '—' }}</span>
@@ -257,6 +258,9 @@ td { padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--separator)
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--fill-quaternary); }
 .name { display: block; font-weight: 600; color: var(--label-primary); }
+/* Die ganze Zeile fuehrt zum Kontakt — auf dem Handy die ganze Karte. */
+.klickbar { cursor: pointer; }
+.klickbar:hover .name { color: var(--accent); }
 td .t-footnote { display: block; }
 
 .leer { text-align: center; padding: var(--sp-10); }
