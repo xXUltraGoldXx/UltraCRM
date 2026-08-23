@@ -14,6 +14,7 @@ import PrivacyView from '../views/PrivacyView.vue';
 import ImportView from '../views/ImportView.vue';
 import ReportsView from '../views/ReportsView.vue';
 import TenantsView from '../views/TenantsView.vue';
+import UsersView from '../views/UsersView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 
 // Platzhalter sind bewusst benannt: sie sagen, was dort entsteht, statt eine
@@ -37,6 +38,7 @@ const routes = [
             { path: 'import', component: ImportView },
             { path: 'auswertung', component: ReportsView },
             { path: 'mandanten', component: TenantsView },
+            { path: 'benutzer', component: UsersView },
         ],
     },
 ];

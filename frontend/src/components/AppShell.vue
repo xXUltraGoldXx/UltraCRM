@@ -70,6 +70,9 @@ function logout() {
 
             <div class="spacer" />
 
+            <RouterLink v-if="auth.isAdmin || auth.isSuperadmin" to="/benutzer" class="navlink">
+                <Icon name="contacts" :size="19" /><span>Benutzer</span>
+            </RouterLink>
             <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="navlink">
                 <Icon name="building" :size="19" /><span>Mandanten</span>
             </RouterLink>
@@ -116,6 +119,9 @@ function logout() {
         <UiSheet :offen="mehrOffen" ohneAktionen @schliessen="mehrOffen = false">
             <RouterLink v-for="w in weitere" :key="w.to" :to="w.to" class="mehr__link" @click="mehrOffen = false">
                 <Icon :name="w.icon" :size="20" /><span>{{ w.label }}</span>
+            </RouterLink>
+            <RouterLink v-if="auth.isAdmin || auth.isSuperadmin" to="/benutzer" class="mehr__link" @click="mehrOffen = false">
+                <Icon name="contacts" :size="20" /><span>Benutzer</span>
             </RouterLink>
             <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="mehr__link" @click="mehrOffen = false">
                 <Icon name="building" :size="20" /><span>Mandanten</span>
