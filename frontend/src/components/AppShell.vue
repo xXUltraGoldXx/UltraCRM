@@ -22,6 +22,7 @@ onMounted(applyTheme);
 const nav = [
     { to: '/', icon: 'overview', label: 'Übersicht', tab: true },
     { to: '/kontakte', icon: 'contacts', label: 'Kontakte', tab: true },
+    { to: '/firmen', icon: 'building', label: 'Firmen' },
     { to: '/pipeline', icon: 'pipeline', label: 'Pipeline', tab: true },
     { to: '/aktivitaeten', icon: 'activity', label: 'Aufgaben', tab: true },
     { to: '/formulare', icon: 'search', label: 'Lead-Formulare' },

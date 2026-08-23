@@ -42,9 +42,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(SearchFilter::class, properties: [
     'lastName' => 'ipartial', 'firstName' => 'ipartial',
     'email' => 'ipartial', 'company.name' => 'ipartial', 'status' => 'exact',
-    'source' => 'exact', 'company' => 'exact',
+    'source' => 'exact', 'company' => 'exact', 'department' => 'ipartial',
 ])]
-#[ApiFilter(OrderFilter::class, properties: ['lastName', 'createdAt', 'status'])]
+#[ApiFilter(OrderFilter::class, properties: ['lastName', 'createdAt', 'status', 'primaryContact', 'department'])]
 class Contact implements TenantOwnedInterface
 {
     /** Bearbeitungsstand im Vertrieb. */
@@ -82,6 +82,24 @@ class Contact implements TenantOwnedInterface
     #[ORM\Column(length: 120, nullable: true)]
     #[Groups(['contact:read', 'contact:write'])]
     private ?string $position = null;
+
+    /**
+     * Abteilung innerhalb der Firma (Vertrieb, Technik, Buchhaltung …).
+     * Freitext statt fester Liste: jede Firma schneidet ihre Abteilungen
+     * anders zu, eine erzwungene Auswahl passt selten.
+     */
+    #[ORM\Column(length: 120, nullable: true)]
+    #[Groups(['contact:read', 'contact:write'])]
+    private ?string $department = null;
+
+    /**
+     * Hauptansprechpartner der Firma. Es kann mehrere Personen geben, aber
+     * nur eine ist die erste Adresse — das steht sonst nur im Kopf des
+     * Vertrieblers.
+     */
+    #[ORM\Column]
+    #[Groups(['contact:read', 'contact:write'])]
+    private bool $primaryContact = false;
 
     #[ORM\ManyToOne(targetEntity: Company::class, inversedBy: 'contacts')]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -183,6 +201,10 @@ class Contact implements TenantOwnedInterface
     public function getPhone(): ?string { return $this->phone; }
     public function setPhone(?string $v): static { $this->phone = $v; return $this; }
     public function getPosition(): ?string { return $this->position; }
+    public function getDepartment(): ?string { return $this->department; }
+    public function setDepartment(?string $v): static { $this->department = $v; return $this; }
+    public function isPrimaryContact(): bool { return $this->primaryContact; }
+    public function setPrimaryContact(bool $v): static { $this->primaryContact = $v; return $this; }
     public function setPosition(?string $v): static { $this->position = $v; return $this; }
     public function getCompany(): ?Company { return $this->company; }
     public function setCompany(?Company $v): static { $this->company = $v; return $this; }

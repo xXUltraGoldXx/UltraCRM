@@ -6,6 +6,8 @@ import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
+import UiField from '../components/ui/UiField.vue';
+import UiSheet from '../components/ui/UiSheet.vue';
 
 /**
  * Kundenakte einer Firma: alles, was zu diesem Kunden gehört, auf einer
@@ -48,6 +50,65 @@ async function laden() {
 }
 onMounted(laden);
 watch(() => route.params.id, laden);
+
+/* Personen nach Abteilung gruppieren; Hauptansprechpartner steht oben.
+   So sieht man auf einen Blick, wer wofür zuständig ist. */
+const nachAbteilung = computed(() => {
+    const gruppen = new Map();
+    [...kontakte.value]
+        .sort((a, b) => (b.primaryContact === true) - (a.primaryContact === true)
+            || (a.lastName || '').localeCompare(b.lastName || ''))
+        .forEach((k) => {
+            const schl = k.department?.trim() || 'Ohne Abteilung';
+            if (!gruppen.has(schl)) gruppen.set(schl, []);
+            gruppen.get(schl).push(k);
+        });
+    // "Ohne Abteilung" ans Ende — benannte Abteilungen sind aussagekräftiger.
+    return [...gruppen.entries()].sort((a, b) =>
+        (a[0] === 'Ohne Abteilung') - (b[0] === 'Ohne Abteilung') || a[0].localeCompare(b[0]));
+});
+
+const personAnlegen = ref(false);
+const personSpeichert = ref(false);
+const leerePerson = () => ({
+    firstName: '', lastName: '', position: '', department: '',
+    email: '', phone: '', primaryContact: false, source: 'sonstiges',
+});
+const person = ref(leerePerson());
+
+async function personSpeichern() {
+    personSpeichert.value = true;
+    try {
+        const n = Object.fromEntries(Object.entries(person.value).filter(([, v]) => v !== '' && v !== false));
+        n.company = `/api/companies/${route.params.id}`;
+        n.source = person.value.source;
+        await api.post('/contacts', n, { headers: { 'Content-Type': 'application/ld+json' } });
+        personAnlegen.value = false;
+        person.value = leerePerson();
+        await laden();
+    } catch (e) {
+        fehler.value = e?.response?.data?.['hydra:description'] || 'Die Person konnte nicht angelegt werden.';
+    } finally {
+        personSpeichert.value = false;
+    }
+}
+
+/* Hauptansprechpartner umsetzen: der bisherige verliert die Markierung,
+   damit es immer genau einen gibt. */
+async function alsHauptansprechpartner(k) {
+    try {
+        const bisher = kontakte.value.filter((x) => x.primaryContact && x.id !== k.id);
+        await Promise.all([
+            ...bisher.map((x) => api.patch(`/contacts/${x.id}`, { primaryContact: false },
+                { headers: { 'Content-Type': 'application/merge-patch+json' } })),
+            api.patch(`/contacts/${k.id}`, { primaryContact: true },
+                { headers: { 'Content-Type': 'application/merge-patch+json' } }),
+        ]);
+        await laden();
+    } catch (e) {
+        fehler.value = 'Die Änderung hat nicht geklappt.';
+    }
+}
 
 const offen = computed(() => vorgaenge.value.filter((d) => d.open));
 const offenerWert = computed(() => geld.format(offen.value.reduce((s, d) => s + Number(d.value || 0), 0)));
@@ -103,18 +164,36 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
 
             <div class="spalten">
                 <UiCard>
-                    <p class="t-caption">Ansprechpartner</p>
-                    <div v-if="kontakte.length" class="stack tight">
-                        <RouterLink v-for="k in kontakte" :key="k.id" :to="`/kontakte/${k.id}`" class="person">
-                            <div class="stack tight">
-                                <span class="person__name">{{ k.displayName }}</span>
-                                <span class="t-footnote muted">{{ k.position || k.email || 'ohne Angabe' }}</span>
+                    <div class="row kopfzeile">
+                        <p class="t-caption">Personen</p>
+                        <span class="spacer" />
+                        <UiButton size="sm" @click="personAnlegen = true">
+                            <Icon name="plus" :size="15" /> Person
+                        </UiButton>
+                    </div>
+
+                    <div v-if="kontakte.length" class="stack">
+                        <div v-for="[abteilung, leute] in nachAbteilung" :key="abteilung" class="stack tight">
+                            <p class="abteilung t-footnote">{{ abteilung }}</p>
+                            <div v-for="k in leute" :key="k.id" class="person">
+                                <RouterLink :to="`/kontakte/${k.id}`" class="person__text">
+                                    <span class="person__name">
+                                        {{ k.displayName }}
+                                        <UiBadge v-if="k.primaryContact" tone="quiet">Hauptkontakt</UiBadge>
+                                    </span>
+                                    <span class="t-footnote muted">
+                                        {{ k.position || 'ohne Funktion' }}
+                                        <template v-if="k.email"> · {{ k.email }}</template>
+                                    </span>
+                                </RouterLink>
+                                <span class="spacer" />
+                                <button v-if="!k.primaryContact" class="markieren t-footnote"
+                                        title="Als Hauptkontakt festlegen"
+                                        @click="alsHauptansprechpartner(k)">
+                                    Hauptkontakt
+                                </button>
                             </div>
-                            <span class="spacer" />
-                            <UiBadge :tone="k.contactable ? 'positive' : 'warn'">
-                                {{ k.contactable ? 'Einwilligung' : 'keine' }}
-                            </UiBadge>
-                        </RouterLink>
+                        </div>
                     </div>
                     <p v-else class="t-footnote muted">Noch keine Person zugeordnet.</p>
                 </UiCard>
@@ -151,6 +230,25 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
                 <p v-else class="t-footnote muted">Noch nichts passiert.</p>
             </UiCard>
         </template>
+
+        <UiSheet :offen="personAnlegen" :titel="`Person zu ${firma?.name ?? ''} hinzufügen`"
+                 bestaetigen="Anlegen" :laeuft="personSpeichert"
+                 @schliessen="personAnlegen = false" @bestaetigen="personSpeichern">
+            <div class="zeile">
+                <UiField v-model="person.firstName" label="Vorname" placeholder="Frank" />
+                <UiField v-model="person.lastName" label="Nachname" placeholder="Müller" />
+            </div>
+            <div class="zeile">
+                <UiField v-model="person.position" label="Funktion" placeholder="z. B. CEO, Vertriebsleiter" />
+                <UiField v-model="person.department" label="Abteilung" placeholder="z. B. Vertrieb" />
+            </div>
+            <UiField v-model="person.email" label="E-Mail" type="email" />
+            <UiField v-model="person.phone" label="Telefon" />
+            <label class="haken">
+                <input v-model="person.primaryContact" type="checkbox" />
+                <span>Hauptansprechpartner dieser Firma</span>
+            </label>
+        </UiSheet>
     </div>
 </template>
 
@@ -177,7 +275,24 @@ p { margin: 0; }
     min-height: 52px;
 }
 .person:hover { border-color: var(--accent); text-decoration: none; }
-.person__name { font-size: var(--text-subhead); font-weight: 600; }
+.person__name { font-size: var(--text-subhead); font-weight: 600; display: flex; align-items: center; gap: var(--sp-2); }
+.person__text { display: flex; flex-direction: column; gap: 2px; text-decoration: none; color: inherit; min-width: 0; }
+.person__text:hover .person__name { color: var(--accent); }
+.kopfzeile { margin-bottom: var(--sp-3); }
+.kopfzeile .t-caption { margin: 0; }
+.abteilung {
+    text-transform: uppercase; letter-spacing: .06em; font-weight: 600;
+    color: var(--label-tertiary); margin: var(--sp-3) 0 var(--sp-1);
+}
+.markieren {
+    border: 1px solid var(--separator); background: transparent;
+    color: var(--label-secondary); border-radius: var(--radius-pill);
+    padding: 5px 11px; cursor: pointer; min-height: 34px; font-family: inherit;
+}
+.markieren:hover { border-color: var(--accent); color: var(--accent); }
+.zeile { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.haken { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--text-subhead); min-height: 44px; }
+.haken input { width: 20px; height: 20px; accent-color: var(--accent); }
 
 .eintrag { border-left: 2px solid var(--separator); padding-left: var(--sp-4); }
 .betreff { font-size: var(--text-subhead); font-weight: 600; margin-top: var(--sp-1); }
