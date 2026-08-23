@@ -6,12 +6,27 @@ import UiSegmented from '../components/ui/UiSegmented.vue';
 
 const zeitraum = ref('30');
 const kontakte = ref(null);
+const offeneDeals = ref(null);
+const offenerWert = ref(null);
+const faellig = ref(null);
 const fehler = ref('');
+
+const geld = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const anzahl = (d) => d['hydra:totalItems'] ?? d.totalItems ?? 0;
 
 onMounted(async () => {
     try {
-        const { data } = await api.get('/customers', { params: { itemsPerPage: 1 } });
-        kontakte.value = data['hydra:totalItems'] ?? data.totalItems ?? 0;
+        const [k, d, a] = await Promise.all([
+            api.get('/contacts', { params: { itemsPerPage: 1 } }),
+            api.get('/deals', { params: { itemsPerPage: 200 } }),
+            api.get('/activities', { params: { done: false, 'exists[dueAt]': true, itemsPerPage: 1 } }),
+        ]);
+        kontakte.value = anzahl(k.data);
+        const deals = d.data['hydra:member'] ?? d.data.member ?? [];
+        const offen = deals.filter((x) => x.open);
+        offeneDeals.value = offen.length;
+        offenerWert.value = geld.format(offen.reduce((s, x) => s + Number(x.value || 0), 0));
+        faellig.value = anzahl(a.data);
     } catch (e) {
         fehler.value = 'Kennzahlen konnten nicht geladen werden.';
     }
@@ -39,14 +54,14 @@ onMounted(async () => {
                 <p class="t-footnote">im Bestand</p>
             </UiCard>
             <UiCard>
-                <p class="t-caption">Offene Deals</p>
-                <p class="t-large-title num">–</p>
-                <p class="t-footnote">folgt mit der Pipeline</p>
+                <p class="t-caption">Offene Vorgänge</p>
+                <p class="t-large-title num">{{ offeneDeals ?? '–' }}</p>
+                <p class="t-footnote">{{ offenerWert ?? '' }} in der Pipeline</p>
             </UiCard>
             <UiCard>
-                <p class="t-caption">Fällig heute</p>
-                <p class="t-large-title num">–</p>
-                <p class="t-footnote">folgt mit den Aktivitäten</p>
+                <p class="t-caption">Wiedervorlagen</p>
+                <p class="t-large-title num">{{ faellig ?? '–' }}</p>
+                <p class="t-footnote">offen und terminiert</p>
             </UiCard>
         </div>
 
