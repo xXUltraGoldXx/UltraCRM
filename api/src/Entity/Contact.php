@@ -42,6 +42,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(SearchFilter::class, properties: [
     'lastName' => 'ipartial', 'firstName' => 'ipartial',
     'email' => 'ipartial', 'company.name' => 'ipartial', 'status' => 'exact',
+    'source' => 'exact',
 ])]
 #[ApiFilter(OrderFilter::class, properties: ['lastName', 'createdAt', 'status'])]
 class Contact implements TenantOwnedInterface

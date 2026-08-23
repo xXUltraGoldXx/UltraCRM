@@ -21,6 +21,13 @@ security:
                 password_path: password
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
+        # Oeffentliche Lead-Annahme: eigene Firewall OHNE jwt, sonst wuerde
+        # die api-Firewall jede anonyme Anfrage abweisen. Bewusst vor ^/api
+        # deklariert — Symfony nimmt die erste passende Firewall.
+        public:
+            pattern: ^/api/public
+            stateless: true
+            security: false
         api:
             pattern: ^/api
             stateless: true
@@ -28,6 +35,7 @@ security:
 
     access_control:
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/public, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

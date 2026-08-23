@@ -24,6 +24,7 @@ const nav = [
     { to: '/kontakte', icon: 'contacts', label: 'Kontakte' },
     { to: '/pipeline', icon: 'pipeline', label: 'Pipeline' },
     { to: '/aktivitaeten', icon: 'activity', label: 'Aktivitäten' },
+    { to: '/formulare', icon: 'search', label: 'Lead-Formulare' },
     { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen' },
 ];
 
