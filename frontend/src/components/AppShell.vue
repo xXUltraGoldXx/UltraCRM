@@ -73,6 +73,9 @@ function logout() {
             <RouterLink v-if="auth.isAdmin || auth.isSuperadmin" to="/benutzer" class="navlink">
                 <Icon name="contacts" :size="19" /><span>Benutzer</span>
             </RouterLink>
+            <RouterLink v-if="auth.isAdmin || auth.isSuperadmin" to="/zusatzfelder" class="navlink">
+                <Icon name="settings" :size="19" /><span>Zusatzfelder</span>
+            </RouterLink>
             <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="navlink">
                 <Icon name="building" :size="19" /><span>Mandanten</span>
             </RouterLink>
@@ -122,6 +125,9 @@ function logout() {
             </RouterLink>
             <RouterLink v-if="auth.isAdmin || auth.isSuperadmin" to="/benutzer" class="mehr__link" @click="mehrOffen = false">
                 <Icon name="contacts" :size="20" /><span>Benutzer</span>
+            </RouterLink>
+            <RouterLink v-if="auth.isAdmin || auth.isSuperadmin" to="/zusatzfelder" class="mehr__link" @click="mehrOffen = false">
+                <Icon name="settings" :size="20" /><span>Zusatzfelder</span>
             </RouterLink>
             <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="mehr__link" @click="mehrOffen = false">
                 <Icon name="building" :size="20" /><span>Mandanten</span>

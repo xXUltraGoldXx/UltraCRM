@@ -14,6 +14,7 @@ import { datum, geld } from '../format.js';
 const route = useRoute();
 const router = useRouter();
 const kontakt = ref(null);
+const zusatzfelder = ref([]);
 const aktivitaeten = ref([]);
 const vorgaenge = ref([]);
 const fehler = ref('');
@@ -25,11 +26,14 @@ async function laden() {
     const id = route.params.id;
     try {
         const iri = `/api/contacts/${id}`;
-        const [k, a, d] = await Promise.all([
+        const [k, a, d, z] = await Promise.all([
             api.get(`/contacts/${id}`),
             api.get('/activities', { params: { contact: iri } }),
             api.get('/deals', { params: { contact: iri } }),
+            api.get('/custom_field_definitions', { params: { entityType: 'contact' } }),
         ]);
+        zusatzfelder.value = (z.data['hydra:member'] ?? z.data.member ?? [])
+            .filter((f) => f.entityType === 'contact');
         kontakt.value = k.data;
         aktivitaeten.value = a.data['hydra:member'] ?? a.data.member ?? [];
         vorgaenge.value = d.data['hydra:member'] ?? d.data.member ?? [];
@@ -75,6 +79,7 @@ const speichert = ref(false);
 
 function bearbeitenOeffnen() {
     entwurf.value = {
+        customData: { ...(kontakt.value.customData ?? {}) },
         firstName: kontakt.value.firstName ?? '',
         lastName: kontakt.value.lastName ?? '',
         email: kontakt.value.email ?? '',
@@ -239,6 +244,24 @@ const offeneVorgaenge = computed(() => vorgaenge.value.filter((d) => d.open));
                         <p v-else class="t-footnote muted">Kein Vorgang verknüpft.</p>
                     </UiCard>
 
+                    <UiCard v-if="zusatzfelder.length">
+                        <p class="t-caption">Weitere Angaben</p>
+                        <dl>
+                            <template v-for="f in zusatzfelder" :key="f.id">
+                                <dt class="t-footnote">{{ f.label }}</dt>
+                                <dd>
+                                    <template v-if="kontakt.customData?.[f.fieldKey] !== undefined && kontakt.customData?.[f.fieldKey] !== null">
+                                        <template v-if="f.type === 'janein'">
+                                            {{ kontakt.customData[f.fieldKey] ? 'Ja' : 'Nein' }}
+                                        </template>
+                                        <template v-else>{{ kontakt.customData[f.fieldKey] }}</template>
+                                    </template>
+                                    <span v-else class="muted">—</span>
+                                </dd>
+                            </template>
+                        </dl>
+                    </UiCard>
+
                     <UiCard>
                         <p class="t-caption">Datenschutz</p>
                         <dl>
@@ -274,6 +297,23 @@ const offeneVorgaenge = computed(() => vorgaenge.value.filter((d) => d.open));
             <UiField v-model="entwurf.phone" label="Telefon" />
             <UiField v-model="entwurf.position" label="Position" />
             <UiField v-model="entwurf.notes" label="Notizen" />
+
+            <template v-for="f in zusatzfelder" :key="f.id">
+                <label v-if="f.type === 'auswahl'" class="feld">
+                    <span class="feld__label">{{ f.label }}{{ f.required ? ' *' : '' }}</span>
+                    <select v-model="entwurf.customData[f.fieldKey]">
+                        <option value="">— keine Angabe —</option>
+                        <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+                    </select>
+                </label>
+                <label v-else-if="f.type === 'janein'" class="haken">
+                    <input v-model="entwurf.customData[f.fieldKey]" type="checkbox" />
+                    <span>{{ f.label }}</span>
+                </label>
+                <UiField v-else v-model="entwurf.customData[f.fieldKey]"
+                         :label="f.label + (f.required ? ' *' : '')"
+                         :type="f.type === 'zahl' ? 'number' : f.type === 'datum' ? 'date' : 'text'" />
+            </template>
         </UiSheet>
     </div>
 </template>
@@ -292,6 +332,15 @@ p { margin: 0; }
 }
 .aktionen { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .firmalink { font-weight: 600; }
+.feld { display: flex; flex-direction: column; gap: var(--sp-2); }
+.feld__label { font-size: var(--text-footnote); font-weight: 600; color: var(--label-secondary); }
+.feld select {
+    font-family: inherit; font-size: var(--text-body); color: var(--label-primary);
+    background: var(--bg-input); border: 1px solid var(--separator);
+    border-radius: var(--radius-m); padding: 11px 14px; min-height: 44px;
+}
+.haken { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--text-subhead); min-height: 44px; }
+.haken input { width: 20px; height: 20px; accent-color: var(--accent); }
 
 .status { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 .statusknopf {

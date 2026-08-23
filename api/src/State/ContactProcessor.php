@@ -5,7 +5,10 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Contact;
+use App\Entity\User;
+use App\Service\CustomFieldValidator;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -22,11 +25,35 @@ final class ContactProcessor implements ProcessorInterface
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private readonly ProcessorInterface $inner,
         private readonly EntityManagerInterface $em,
+        private readonly CustomFieldValidator $customFields,
+        private readonly Security $security,
     ) {
     }
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
+        if ($data instanceof Contact && $data->getCustomData() !== null) {
+            // Zusatzfelder gegen ihre Definition pruefen, bevor irgendetwas
+            // gespeichert wird — ein freies JSON-Feld nimmt sonst alles an.
+            //
+            // Beim Anlegen hat der Datensatz hier noch KEINEN Mandanten: den
+            // setzt der TenantAssignListener erst beim Speichern, also nach
+            // diesem Processor. Ohne den Rueckgriff auf den angemeldeten
+            // Benutzer fand die Pruefung deshalb keine Definitionen und
+            // verwarf stillschweigend alle Werte (im Test aufgefallen).
+            $benutzer = $this->security->getUser();
+            $mandant = $data->getTenant()
+                ?? ($benutzer instanceof User ? $benutzer->getTenant() : null);
+
+            $ergebnis = $this->customFields->pruefen($data->getCustomData(), 'contact', $mandant);
+            if ($ergebnis['fehler'] !== []) {
+                throw new \ApiPlatform\Validator\Exception\ValidationException(
+                    implode(' ', $ergebnis['fehler'])
+                );
+            }
+            $data->setCustomData($ergebnis['werte']);
+        }
+
         if (!$data instanceof Contact || !$data->isPrimaryContact() || $data->getCompany() === null) {
             return $this->inner->process($data, $operation, $uriVariables, $context);
         }

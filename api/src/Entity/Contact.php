@@ -154,6 +154,15 @@ class Contact implements TenantOwnedInterface
     #[Groups(['contact:read', 'contact:write'])]
     private ?string $notes = null;
 
+    /**
+     * Werte der selbst angelegten Zusatzfelder, als JSON am Datensatz.
+     * Geprueft wird serverseitig gegen CustomFieldDefinition — siehe
+     * CustomFieldValidator.
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['contact:read', 'contact:write'])]
+    private ?array $customData = null;
+
     #[ORM\Column]
     #[Groups(['contact:read'])]
     private \DateTimeImmutable $createdAt;
@@ -229,6 +238,8 @@ class Contact implements TenantOwnedInterface
     public function setConfirmToken(?string $v): static { $this->confirmToken = $v; return $this; }
     public function setDeleteAfter(?\DateTimeImmutable $v): static { $this->deleteAfter = $v; return $this; }
     public function getNotes(): ?string { return $this->notes; }
+    public function getCustomData(): ?array { return $this->customData; }
+    public function setCustomData(?array $v): static { $this->customData = $v; return $this; }
     public function setNotes(?string $v): static { $this->notes = $v; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
 }
