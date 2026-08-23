@@ -102,4 +102,20 @@ p { margin: 0; }
 .wert { text-align: right; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 700px) { .zeile { grid-template-columns: 100px 1fr 90px; } }
+
+@media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; gap: var(--sp-2); }
+    /* Auf Handy-Hoehe zaehlt jede Zeile: Kennzahl und Beschriftung stehen
+       nebeneinander statt in einer hohen Karte untereinander. */
+    .grid :deep(.card) {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        row-gap: 2px;
+        padding: var(--sp-4);
+    }
+    .grid :deep(.card) .t-caption { grid-column: 1; margin: 0; }
+    .grid :deep(.card) .num { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: var(--text-title-1); }
+    .grid :deep(.card) .t-footnote { grid-column: 1; }
+}
 </style>

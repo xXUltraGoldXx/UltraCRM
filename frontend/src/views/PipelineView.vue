@@ -5,6 +5,8 @@ import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
+import UiSegmented from '../components/ui/UiSegmented.vue';
+import UiSheet from '../components/ui/UiSheet.vue';
 
 const PHASEN = [
     { key: 'neu', label: 'Neu' },
@@ -23,6 +25,11 @@ const speichert = ref(false);
 const formFehler = ref('');
 const entwurf = ref({ title: '', value: '', stage: 'neu' });
 const ziehtId = ref(null);
+// Auf schmalen Bildschirmen wird eine Phase zur Zeit gezeigt; sechs Spalten
+// nebeneinander sind auf dem Handy nicht bedienbar.
+const mobilPhase = ref('neu');
+const istSchmal = ref(window.matchMedia('(max-width: 820px)').matches);
+window.matchMedia('(max-width: 820px)').addEventListener('change', (e) => { istSchmal.value = e.matches; });
 
 const geld = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
 
@@ -72,23 +79,43 @@ async function speichern() {
 
 /* Verschieben per Ziehen. Bei "verloren" ist eine Begruendung Pflicht —
    die API lehnt sonst ab, deshalb wird sie vorher erfragt. */
+const verlustBlatt = ref(null); // { deal, phase }
+const verlustGrund = ref('');
+const verlustLaeuft = ref(false);
+
 async function ablegen(phase) {
-    const id = ziehtId.value;
+    const deal = deals.value.find((d) => d.id === ziehtId.value);
     ziehtId.value = null;
-    const deal = deals.value.find((d) => d.id === id);
+    if (deal) await verschiebe(deal, phase);
+}
+
+async function verschiebe(deal, phase) {
     if (!deal || deal.stage === phase) return;
 
-    const patch = { stage: phase };
+    // Verloren braucht eine Begruendung — dafuer ein richtiges Blatt statt
+    // eines Browser-Dialogs.
     if (phase === 'verloren') {
-        const grund = window.prompt('Warum ging der Vorgang verloren?');
-        if (!grund) return;
-        patch.lostReason = grund;
+        verlustGrund.value = '';
+        verlustBlatt.value = { deal, phase };
+        return;
     }
+    await schreibe(deal, { stage: phase }, phase);
+}
 
+async function verlustBestaetigen() {
+    if (!verlustGrund.value.trim()) return;
+    verlustLaeuft.value = true;
+    const { deal } = verlustBlatt.value;
+    await schreibe(deal, { stage: 'verloren', lostReason: verlustGrund.value.trim() }, 'verloren');
+    verlustLaeuft.value = false;
+    verlustBlatt.value = null;
+}
+
+async function schreibe(deal, patch, phase) {
     const vorher = deal.stage;
     deal.stage = phase; // sofortige Rueckmeldung
     try {
-        await api.patch(`/deals/${id}`, patch, { headers: { 'Content-Type': 'application/merge-patch+json' } });
+        await api.patch(`/deals/${deal.id}`, patch, { headers: { 'Content-Type': 'application/merge-patch+json' } });
         await laden();
     } catch (e) {
         deal.stage = vorher; // zurueckrollen, wenn der Server ablehnt
@@ -129,8 +156,11 @@ async function ablegen(phase) {
 
         <p v-if="fehler" class="t-footnote fehler">{{ fehler }}</p>
 
-        <div class="board">
-            <section v-for="p in PHASEN" :key="p.key" class="spalte"
+        <UiSegmented v-if="istSchmal" v-model="mobilPhase" class="phasenwahl"
+                     :options="PHASEN.map((p) => ({ value: p.key, label: p.label }))" />
+
+        <div class="board" :class="{ 'board--einzeln': istSchmal }">
+            <section v-for="p in PHASEN.filter((x) => !istSchmal || x.key === mobilPhase)" :key="p.key" class="spalte"
                      @dragover.prevent @drop="ablegen(p.key)">
                 <header class="spalte__kopf">
                     <span class="t-caption">{{ p.label }}</span>
@@ -142,11 +172,25 @@ async function ablegen(phase) {
                     <p class="deal__titel">{{ d.title }}</p>
                     <p class="t-footnote">{{ d.value ? geld.format(Number(d.value)) : 'ohne Wert' }}</p>
                     <p v-if="d.company" class="t-footnote muted">{{ d.company.name }}</p>
+
+                    <!-- Ziehen geht auf dem Handy nicht zuverlaessig: dort
+                         wechselt die Phase ueber eine Auswahl direkt auf der Karte. -->
+                    <select v-if="istSchmal" class="phasewechsel" :value="d.stage"
+                            @change="verschiebe(d, $event.target.value)">
+                        <option v-for="p2 in PHASEN" :key="p2.key" :value="p2.key">→ {{ p2.label }}</option>
+                    </select>
                 </article>
 
                 <p v-if="!(nachPhase[p.key] || []).length" class="leer t-footnote">Nichts hier</p>
             </section>
         </div>
+
+        <UiSheet :offen="!!verlustBlatt" titel="Vorgang verloren"
+                 :text="`Warum ging „${verlustBlatt?.deal?.title ?? ''}“ verloren? Die Begründung hilft später beim Auswerten.`"
+                 bestaetigen="Als verloren markieren" ton="danger" :laeuft="verlustLaeuft"
+                 @schliessen="verlustBlatt = null" @bestaetigen="verlustBestaetigen">
+            <UiField v-model="verlustGrund" label="Grund" placeholder="z. B. Preis, Zeitpunkt, Mitbewerber" />
+        </UiSheet>
     </div>
 </template>
 
@@ -166,6 +210,22 @@ select {
     border-radius: var(--radius-m); padding: 11px 14px;
 }
 
+/* Die Klasse landet auf dem Wurzelelement der Komponente — das IST bereits
+   das Segment-Element. Ein :deep()-Nachfahrenselektor liefe hier ins Leere. */
+.phasenwahl {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+}
+.phasenwahl :deep(button) { min-height: 40px; }
+.board--einzeln { grid-template-columns: 1fr !important; }
+.phasewechsel {
+    margin-top: var(--sp-3); width: 100%; min-height: 40px;
+    font-family: inherit; font-size: var(--text-footnote);
+    color: var(--accent); background: var(--accent-quiet);
+    border: 0; border-radius: var(--radius-s); padding: 0 var(--sp-2);
+}
 .board { display: grid; grid-template-columns: repeat(6, minmax(168px, 1fr)); gap: var(--sp-3); overflow-x: auto; padding-bottom: var(--sp-2); }
 .spalte {
     display: flex; flex-direction: column; gap: var(--sp-2);

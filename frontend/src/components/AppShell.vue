@@ -20,14 +20,20 @@ function toggleTheme() {
 onMounted(applyTheme);
 
 const nav = [
-    { to: '/', icon: 'overview', label: 'Übersicht' },
-    { to: '/kontakte', icon: 'contacts', label: 'Kontakte' },
-    { to: '/pipeline', icon: 'pipeline', label: 'Pipeline' },
-    { to: '/aktivitaeten', icon: 'activity', label: 'Aktivitäten' },
+    { to: '/', icon: 'overview', label: 'Übersicht', tab: true },
+    { to: '/kontakte', icon: 'contacts', label: 'Kontakte', tab: true },
+    { to: '/pipeline', icon: 'pipeline', label: 'Pipeline', tab: true },
+    { to: '/aktivitaeten', icon: 'activity', label: 'Aufgaben', tab: true },
     { to: '/formulare', icon: 'search', label: 'Lead-Formulare' },
     { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen' },
     { to: '/auswertung', icon: 'pipeline', label: 'Auswertung' },
 ];
+
+// Auf dem Handy passen vier Ziele in die Leiste; alles Weitere liegt hinter
+// "Mehr". Mehr als fuenf Tabs sind auf Daumenbreite nicht mehr treffsicher.
+const tabs = nav.filter((n) => n.tab);
+const weitere = nav.filter((n) => !n.tab);
+const mehrOffen = ref(false);
 
 const title = computed(() => nav.find((n) => n.to === route.path)?.label ?? 'UltraCRM');
 const initials = computed(() => (auth.user?.displayName || auth.user?.username || '?')
@@ -84,7 +90,43 @@ function logout() {
             <main class="content">
                 <RouterView />
             </main>
+
+            <!-- Tab-Leiste: nur auf dem Handy sichtbar -->
+            <nav class="tabbar">
+                <RouterLink v-for="t in tabs" :key="t.to" :to="t.to" class="tab">
+                    <Icon :name="t.icon" :size="22" />
+                    <span>{{ t.label }}</span>
+                </RouterLink>
+                <button class="tab" :class="{ aktiv: mehrOffen }" @click="mehrOffen = true">
+                    <Icon name="settings" :size="22" />
+                    <span>Mehr</span>
+                </button>
+            </nav>
         </div>
+
+        <!-- Mehr-Menü als Blatt von unten -->
+        <Teleport to="body">
+            <Transition name="mehr">
+                <div v-if="mehrOffen" class="mehr-huelle" @click.self="mehrOffen = false">
+                    <div class="mehr">
+                        <div class="griff" />
+                        <RouterLink v-for="w in weitere" :key="w.to" :to="w.to" class="mehr__link" @click="mehrOffen = false">
+                            <Icon :name="w.icon" :size="20" /><span>{{ w.label }}</span>
+                        </RouterLink>
+                        <RouterLink v-if="auth.isSuperadmin" to="/mandanten" class="mehr__link" @click="mehrOffen = false">
+                            <Icon name="building" :size="20" /><span>Mandanten</span>
+                        </RouterLink>
+                        <button class="mehr__link" @click="toggleTheme">
+                            <Icon :name="theme === 'dark' ? 'sun' : 'moon'" :size="20" />
+                            <span>{{ theme === 'dark' ? 'Helles Erscheinungsbild' : 'Dunkles Erscheinungsbild' }}</span>
+                        </button>
+                        <button class="mehr__link mehr__link--weg" @click="logout">
+                            <Icon name="logout" :size="20" /><span>Abmelden</span>
+                        </button>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
 </template>
 
@@ -165,12 +207,74 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 
 .content { padding: var(--sp-8); max-width: 1180px; width: 100%; }
 
+/* Tab-Leiste: unten, mit Blur, ueber dem Home-Indikator freigehalten. */
+.tabbar { display: none; }
+
 @media (max-width: 900px) {
     .shell { grid-template-columns: 1fr; }
-    .sidebar { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; }
-    .sidebar nav { flex-direction: row; }
-    .brand { padding: 0 var(--sp-3) 0 0; }
-    .account, .sidebar > .navlink { display: none; }
-    .content { padding: var(--sp-5) var(--sp-4); }
+    .sidebar { display: none; }
+    .navbar { padding: var(--sp-3) var(--sp-4); }
+    /* Theme und Abmelden liegen auf dem Handy im Mehr-Menue — hier waeren
+       sie doppelt und wuerden die Leiste unnoetig fuellen. */
+    .navbar .iconbtn { display: none; }
+    .content {
+        padding: var(--sp-4) var(--sp-4) calc(76px + env(safe-area-inset-bottom));
+    }
+
+    .tabbar {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+        display: grid; grid-template-columns: repeat(5, 1fr);
+        background: var(--nav-bg);
+        backdrop-filter: var(--nav-blur);
+        -webkit-backdrop-filter: var(--nav-blur);
+        border-top: 1px solid var(--separator);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .tab {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 3px;
+        min-height: 56px;
+        border: 0; background: transparent;
+        color: var(--label-tertiary);
+        font-family: inherit; font-size: 10px; font-weight: 550;
+        text-decoration: none; cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .tab span { letter-spacing: -0.01em; }
+    .tab.router-link-exact-active, .tab.aktiv { color: var(--accent); }
 }
+
+.mehr-huelle {
+    position: fixed; inset: 0; z-index: 90;
+    display: flex; align-items: flex-end;
+    background: rgba(0,0,0,.45);
+    backdrop-filter: blur(3px);
+}
+.mehr {
+    width: 100%;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--sp-3) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 2px;
+}
+.mehr .griff {
+    width: 38px; height: 5px; border-radius: var(--radius-pill);
+    background: var(--fill-tertiary); margin: 0 auto var(--sp-3);
+}
+.mehr__link {
+    display: flex; align-items: center; gap: var(--sp-4);
+    min-height: 52px; padding: 0 var(--sp-3);
+    border: 0; background: transparent;
+    color: var(--label-primary);
+    font-family: inherit; font-size: var(--text-body); text-align: left;
+    border-radius: var(--radius-m);
+    text-decoration: none; cursor: pointer;
+}
+.mehr__link:active { background: var(--fill-quaternary); }
+.mehr__link--weg { color: var(--danger); }
+
+.mehr-enter-active, .mehr-leave-active { transition: opacity .2s ease; }
+.mehr-enter-active .mehr, .mehr-leave-active .mehr { transition: transform .24s cubic-bezier(.32,.72,0,1); }
+.mehr-enter-from, .mehr-leave-to { opacity: 0; }
+.mehr-enter-from .mehr, .mehr-leave-to .mehr { transform: translateY(100%); }
 </style>

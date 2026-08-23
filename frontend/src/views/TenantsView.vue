@@ -95,4 +95,8 @@ async function speichern() {
 .zeile { display: flex; align-items: center; gap: var(--sp-4); }
 .tight { gap: 2px; }
 .zeile p { margin: 0; }
+
+@media (max-width: 700px) {
+    .head :deep(.btn) { width: 100%; min-height: 46px; }
+}
 </style>

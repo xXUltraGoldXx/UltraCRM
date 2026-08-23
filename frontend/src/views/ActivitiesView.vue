@@ -167,6 +167,14 @@ select {
 .eintrag p { margin: 0; }
 .betreff { font-size: var(--text-subhead); font-weight: 600; }
 
+@media (max-width: 700px) {
+    .eintrag { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+    .eintrag :deep(.btn) { width: 100%; min-height: 44px; }
+    .head :deep(.btn) { width: 100%; min-height: 46px; }
+    .form__grid { grid-template-columns: 1fr; }
+    :deep(.seg) { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }
+}
+
 .leer { text-align: center; padding: var(--sp-10); }
 .leer p { margin: 0 0 var(--sp-2); }
 </style>

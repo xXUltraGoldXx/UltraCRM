@@ -159,10 +159,10 @@ const anzahl = computed(() => kontakte.value.length);
                             <span class="name">{{ k.displayName }}</span>
                             <span class="t-footnote">{{ k.email || k.phone || '—' }}</span>
                         </td>
-                        <td class="muted">{{ k.company?.name || '—' }}</td>
-                        <td><UiBadge :tone="k.status === 'kunde' ? 'positive' : 'neutral'">{{ STATUS_LABEL[k.status] }}</UiBadge></td>
-                        <td class="muted">{{ QUELLE_LABEL[k.source] }}</td>
-                        <td>
+                        <td class="muted" data-label="Firma">{{ k.company?.name || '—' }}</td>
+                        <td data-label="Status"><UiBadge :tone="k.status === 'kunde' ? 'positive' : 'neutral'">{{ STATUS_LABEL[k.status] }}</UiBadge></td>
+                        <td class="muted" data-label="Herkunft">{{ QUELLE_LABEL[k.source] }}</td>
+                        <td data-label="Werbung">
                             <UiBadge :tone="k.contactable ? 'positive' : 'warn'">
                                 {{ k.contactable ? 'Einwilligung liegt vor' : 'Keine Einwilligung' }}
                             </UiBadge>
@@ -194,6 +194,13 @@ select {
 select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-quiet); }
 
 .toolbar { flex-wrap: wrap; justify-content: space-between; }
+@media (max-width: 700px) {
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .suche { min-width: 0; min-height: 44px; }
+    .toolbar :deep(.seg) { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .head :deep(.btn) { width: 100%; min-height: 46px; }
+    .form__grid { grid-template-columns: 1fr; }
+}
 .suche {
     display: flex; align-items: center; gap: var(--sp-2);
     background: var(--bg-elevated); border: 1px solid var(--separator);
@@ -207,6 +214,38 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px
 }
 
 .tabelle { background: var(--bg-elevated); border: 1px solid var(--separator); border-radius: var(--radius-l); overflow: hidden; }
+
+/* Handy: Tabellen sind auf Daumenbreite unlesbar — jede Zeile wird zur
+   Karte, die Spaltenueberschriften verschwinden, die Zellen bekommen ihre
+   Bedeutung ueber data-label. */
+@media (max-width: 760px) {
+    .tabelle { background: transparent; border: 0; border-radius: 0; }
+    thead { display: none; }
+    tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: var(--sp-2) var(--sp-3);
+        background: var(--bg-elevated);
+        border: 1px solid var(--separator);
+        border-radius: var(--radius-m);
+        padding: var(--sp-4);
+        margin-bottom: var(--sp-2);
+    }
+    tbody tr:hover { background: var(--bg-elevated); }
+    /* Die Trennlinien der Tabelle muessen in der Kartenansicht weg —
+       sonst sieht die Karte aus wie eine Tabelle im Kleinen. */
+    td, tbody tr td { border-bottom: 0; padding: 0; }
+    td:first-child { grid-column: 1 / -1; padding-bottom: var(--sp-1); }
+    td[data-label]::before {
+        content: attr(data-label) ' ';
+        color: var(--label-tertiary);
+        font-size: var(--text-caption);
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        display: block;
+        margin-bottom: 2px;
+    }
+}
 table { width: 100%; border-collapse: collapse; }
 th {
     text-align: left; font-size: var(--text-caption); font-weight: 600;

@@ -5,6 +5,8 @@ import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
+import UiField from '../components/ui/UiField.vue';
+import UiSheet from '../components/ui/UiSheet.vue';
 
 const kontakte = ref([]);
 const protokoll = ref([]);
@@ -59,18 +61,29 @@ async function widerrufen(k) {
     }
 }
 
-async function loeschen(k) {
-    const grund = window.prompt(
-        `Kontakt „${k.displayName}" endgültig löschen.\n\nDie Daten sind danach nicht wiederherstellbar. `
-        + `Im Protokoll bleibt nur der Nachweis ohne Personendaten.\n\nGrund der Löschung:`
-    );
-    if (!grund) return;
+/* Löschen ist unumkehrbar — deshalb ein eigenes Blatt mit Warnung und
+   Pflichtgrund statt eines Browser-Dialogs, den man wegklickt. */
+const loeschBlatt = ref(null);
+const loeschGrund = ref('');
+const loeschLaeuft = ref(false);
+
+function loeschenFragen(k) {
+    loeschGrund.value = '';
+    loeschBlatt.value = k;
+}
+
+async function loeschenBestaetigen() {
+    if (!loeschGrund.value.trim()) return;
+    loeschLaeuft.value = true;
     try {
-        const { data } = await api.post(`/privacy/contacts/${k.id}/erase`, { reason: grund });
+        const { data } = await api.post(`/privacy/contacts/${loeschBlatt.value.id}/erase`, { reason: loeschGrund.value.trim() });
         hinweis.value = `Gelöscht. Mitgelöschte Datensätze: ${data.protokoll.mitgeloeschteDatensaetze}.`;
+        loeschBlatt.value = null;
         await laden();
     } catch (e) {
         fehler.value = e?.response?.data?.error || 'Die Löschung hat nicht geklappt.';
+    } finally {
+        loeschLaeuft.value = false;
     }
 }
 </script>
@@ -107,7 +120,7 @@ async function loeschen(k) {
                         <td class="aktionen">
                             <UiButton size="sm" @click="auskunft(k)">Auskunft</UiButton>
                             <UiButton v-if="k.contactable" size="sm" @click="widerrufen(k)">Widerrufen</UiButton>
-                            <UiButton size="sm" variant="danger" @click="loeschen(k)">Löschen</UiButton>
+                            <UiButton size="sm" variant="danger" @click="loeschenFragen(k)">Löschen</UiButton>
                         </td>
                     </tr>
                     <tr v-if="!kontakte.length"><td colspan="3" class="leer t-footnote">Keine Kontakte vorhanden.</td></tr>
@@ -135,6 +148,16 @@ async function loeschen(k) {
                 </tbody>
             </table>
         </UiCard>
+
+        <UiSheet :offen="!!loeschBlatt"
+                 :titel="`„${loeschBlatt?.displayName ?? ''}“ endgültig löschen?`"
+                 text="Die Daten sind danach nicht wiederherstellbar. Im Protokoll bleibt nur der Nachweis der Löschung — ohne Personendaten."
+                 bestaetigen="Endgültig löschen" ton="danger" :laeuft="loeschLaeuft"
+                 @schliessen="loeschBlatt = null" @bestaetigen="loeschenBestaetigen">
+            <UiField v-model="loeschGrund" label="Grund der Löschung"
+                     placeholder="z. B. Betroffene hat Löschung verlangt"
+                     hint="Pflichtangabe — sie steht später im Protokoll." />
+        </UiSheet>
     </div>
 </template>
 
@@ -153,5 +176,19 @@ tbody tr:last-child td { border-bottom: 0; }
 .name { display: block; font-weight: 600; }
 td .t-footnote { display: block; }
 .aktionen { display: flex; gap: var(--sp-2); justify-content: flex-end; flex-wrap: wrap; }
+.aktionen :deep(.btn) { min-height: 40px; }
+
+@media (max-width: 760px) {
+    table, tbody, tr, td { display: block; }
+    tbody tr {
+        border: 1px solid var(--separator);
+        border-radius: var(--radius-m);
+        padding: var(--sp-4);
+        margin-bottom: var(--sp-2);
+    }
+    td { border: 0; padding: 0 0 var(--sp-2); }
+    .aktionen { justify-content: stretch; padding-bottom: 0; }
+    .aktionen :deep(.btn) { flex: 1; min-height: 44px; }
+}
 .leer { text-align: center; color: var(--label-tertiary); }
 </style>

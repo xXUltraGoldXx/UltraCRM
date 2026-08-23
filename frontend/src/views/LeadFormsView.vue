@@ -154,4 +154,10 @@ pre {
 }
 .leer { text-align: center; padding: var(--sp-10); }
 .leer p { margin: 0 0 var(--sp-2); }
+
+@media (max-width: 700px) {
+    .head :deep(.btn) { width: 100%; min-height: 46px; }
+    .eintrag .row { flex-wrap: wrap; }
+    .eintrag :deep(.btn) { min-height: 44px; }
+}
 </style>
