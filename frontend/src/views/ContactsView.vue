@@ -56,6 +56,34 @@ watch([suche, filter], () => {
 });
 onMounted(laden);
 
+/* Export: nutzt dieselben Filter wie die Liste gerade zeigt. Download über
+   Blob, damit der Authorization-Header mitgeht — ein einfacher Link würde
+   ohne Anmeldung landen (siehe PrivacyView.vue, auskunft()). */
+const exportOffen = ref(false);
+const exportLaeuft = ref(false);
+
+async function exportieren(format) {
+    exportOffen.value = false;
+    exportLaeuft.value = true;
+    fehler.value = '';
+    try {
+        const params = {};
+        if (suche.value.trim()) params['lastName'] = suche.value.trim();
+        if (filter.value !== 'alle') params['status'] = filter.value;
+        const antwort = await api.get(`/export/contacts.${format}`, { params, responseType: 'blob' });
+        const url = URL.createObjectURL(antwort.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `kontakte-${new Date().toISOString().slice(0, 10)}.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        fehler.value = 'Der Export konnte nicht erstellt werden.';
+    } finally {
+        exportLaeuft.value = false;
+    }
+}
+
 async function speichern() {
     speichert.value = true;
     formFehler.value = '';
@@ -136,6 +164,16 @@ const anzahl = computed(() => kontakte.value.length);
                 { value: 'qualifiziert', label: 'Qualifiziert' },
                 { value: 'kunde', label: 'Kunden' },
             ]" />
+
+            <div class="export">
+                <UiButton variant="quiet" size="sm" :disabled="exportLaeuft" @click="exportOffen = !exportOffen">
+                    {{ exportLaeuft ? 'Wird erstellt…' : 'Exportieren' }}
+                </UiButton>
+                <div v-if="exportOffen" class="export__menu">
+                    <button type="button" @click="exportieren('csv')">Als CSV</button>
+                    <button type="button" @click="exportieren('xlsx')">Als Excel</button>
+                </div>
+            </div>
         </div>
 
         <UiCard v-if="fehler"><p class="t-body">{{ fehler }}</p></UiCard>
@@ -201,7 +239,24 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px
     .toolbar :deep(.seg) { display: grid; grid-template-columns: repeat(4, 1fr); }
     .head :deep(.btn) { width: 100%; min-height: 46px; }
     .form__grid { grid-template-columns: 1fr; }
+    .export :deep(.btn) { width: 100%; }
 }
+
+/* Export: unauffälliger Knopf mit kleinem Auswahlmenü CSV/Excel. */
+.export { position: relative; }
+.export__menu {
+    position: absolute; top: calc(100% + var(--sp-2)); right: 0; z-index: 10;
+    display: flex; flex-direction: column; min-width: 140px;
+    background: var(--bg-elevated); border: 1px solid var(--separator);
+    border-radius: var(--radius-m); box-shadow: var(--shadow-card);
+    overflow: hidden;
+}
+.export__menu button {
+    appearance: none; border: 0; background: transparent; text-align: left;
+    font-family: inherit; font-size: var(--text-subhead); color: var(--label-primary);
+    padding: var(--sp-3) var(--sp-4); cursor: pointer; min-height: 44px;
+}
+.export__menu button:hover { background: var(--fill-quaternary); }
 .suche {
     display: flex; align-items: center; gap: var(--sp-2);
     background: var(--bg-elevated); border: 1px solid var(--separator);

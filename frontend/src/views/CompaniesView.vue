@@ -41,6 +41,31 @@ let timer;
 watch(suche, () => { clearTimeout(timer); timer = setTimeout(laden, 250); });
 onMounted(laden);
 
+/* Export: nutzt dieselbe Suche wie die Liste gerade zeigt. Download über
+   Blob, damit der Authorization-Header mitgeht — ein einfacher Link würde
+   ohne Anmeldung landen (siehe PrivacyView.vue, auskunft()). */
+const exportOffen = ref(false);
+const exportLaeuft = ref(false);
+
+async function exportieren(format) {
+    exportOffen.value = false;
+    exportLaeuft.value = true;
+    try {
+        const params = suche.value.trim() ? { name: suche.value.trim() } : {};
+        const antwort = await api.get(`/export/companies.${format}`, { params, responseType: 'blob' });
+        const url = URL.createObjectURL(antwort.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `firmen-${new Date().toISOString().slice(0, 10)}.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        fehler.value = 'Der Export konnte nicht erstellt werden.';
+    } finally {
+        exportLaeuft.value = false;
+    }
+}
+
 async function speichern() {
     speichert.value = true;
     try {
@@ -69,10 +94,22 @@ async function speichern() {
             </UiButton>
         </header>
 
-        <label class="suche">
-            <Icon name="search" :size="17" />
-            <input v-model="suche" type="search" placeholder="Firma suchen" />
-        </label>
+        <div class="row toolbar">
+            <label class="suche">
+                <Icon name="search" :size="17" />
+                <input v-model="suche" type="search" placeholder="Firma suchen" />
+            </label>
+
+            <div class="export">
+                <UiButton variant="quiet" size="sm" :disabled="exportLaeuft" @click="exportOffen = !exportOffen">
+                    {{ exportLaeuft ? 'Wird erstellt…' : 'Exportieren' }}
+                </UiButton>
+                <div v-if="exportOffen" class="export__menu">
+                    <button type="button" @click="exportieren('csv')">Als CSV</button>
+                    <button type="button" @click="exportieren('xlsx')">Als Excel</button>
+                </div>
+            </div>
+        </div>
 
         <p v-if="fehler" class="t-footnote fehler">{{ fehler }}</p>
 
@@ -114,6 +151,7 @@ async function speichern() {
 .fehler { color: var(--danger); }
 .tight { gap: 2px; }
 
+.toolbar { flex-wrap: wrap; justify-content: space-between; }
 .suche {
     display: flex; align-items: center; gap: var(--sp-2);
     background: var(--bg-elevated); border: 1px solid var(--separator);
@@ -121,6 +159,22 @@ async function speichern() {
     color: var(--label-tertiary); min-height: 44px;
 }
 .suche input { border: 0; background: transparent; outline: none; font-family: inherit; font-size: var(--text-subhead); color: var(--label-primary); width: 100%; }
+
+/* Export: unauffälliger Knopf mit kleinem Auswahlmenü CSV/Excel. */
+.export { position: relative; }
+.export__menu {
+    position: absolute; top: calc(100% + var(--sp-2)); right: 0; z-index: 10;
+    display: flex; flex-direction: column; min-width: 140px;
+    background: var(--bg-elevated); border: 1px solid var(--separator);
+    border-radius: var(--radius-m); box-shadow: var(--shadow-card);
+    overflow: hidden;
+}
+.export__menu button {
+    appearance: none; border: 0; background: transparent; text-align: left;
+    font-family: inherit; font-size: var(--text-subhead); color: var(--label-primary);
+    padding: var(--sp-3) var(--sp-4); cursor: pointer; min-height: 44px;
+}
+.export__menu button:hover { background: var(--fill-quaternary); }
 
 .liste { display: flex; flex-direction: column; gap: var(--sp-2); }
 .firma {
@@ -139,5 +193,8 @@ async function speichern() {
 
 @media (max-width: 700px) {
     .head :deep(.btn) { width: 100%; min-height: 46px; }
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .suche { min-width: 0; }
+    .export :deep(.btn) { width: 100%; }
 }
 </style>

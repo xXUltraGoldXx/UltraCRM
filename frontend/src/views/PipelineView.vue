@@ -47,6 +47,31 @@ async function laden() {
 }
 onMounted(laden);
 
+/* Export: Download über Blob, damit der Authorization-Header mitgeht — ein
+   einfacher Link würde ohne Anmeldung landen (siehe PrivacyView.vue,
+   auskunft()). Die Pipeline lädt serverseitig ohnehin alle Vorgänge, daher
+   ohne zusätzliche Filterparameter. */
+const exportOffen = ref(false);
+const exportLaeuft = ref(false);
+
+async function exportieren(format) {
+    exportOffen.value = false;
+    exportLaeuft.value = true;
+    try {
+        const antwort = await api.get(`/export/deals.${format}`, { responseType: 'blob' });
+        const url = URL.createObjectURL(antwort.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `vorgaenge-${new Date().toISOString().slice(0, 10)}.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        fehler.value = 'Der Export konnte nicht erstellt werden.';
+    } finally {
+        exportLaeuft.value = false;
+    }
+}
+
 const nachPhase = computed(() => Object.fromEntries(
     PHASEN.map((p) => [p.key, deals.value.filter((d) => d.stage === p.key)]),
 ));
@@ -131,9 +156,20 @@ async function schreibe(deal, patch, phase) {
                 <h2 class="t-large-title">Pipeline</h2>
                 <p class="t-subhead">{{ offeneSumme }} in offenen Vorgängen</p>
             </div>
-            <UiButton variant="primary" @click="formOffen = !formOffen">
-                <Icon name="plus" :size="16" /> Vorgang anlegen
-            </UiButton>
+            <div class="row head__aktionen">
+                <div class="export">
+                    <UiButton variant="quiet" size="sm" :disabled="exportLaeuft" @click="exportOffen = !exportOffen">
+                        {{ exportLaeuft ? 'Wird erstellt…' : 'Exportieren' }}
+                    </UiButton>
+                    <div v-if="exportOffen" class="export__menu">
+                        <button type="button" @click="exportieren('csv')">Als CSV</button>
+                        <button type="button" @click="exportieren('xlsx')">Als Excel</button>
+                    </div>
+                </div>
+                <UiButton variant="primary" @click="formOffen = !formOffen">
+                    <Icon name="plus" :size="16" /> Vorgang anlegen
+                </UiButton>
+            </div>
         </header>
 
         <UiCard v-if="formOffen" class="form">
@@ -197,7 +233,24 @@ async function schreibe(deal, patch, phase) {
 <style scoped>
 .head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; }
 .head p { margin: var(--sp-1) 0 0; }
+.head__aktionen { flex-wrap: wrap; }
 .fehler { color: var(--danger); }
+
+/* Export: unauffälliger Knopf mit kleinem Auswahlmenü CSV/Excel. */
+.export { position: relative; }
+.export__menu {
+    position: absolute; top: calc(100% + var(--sp-2)); right: 0; z-index: 10;
+    display: flex; flex-direction: column; min-width: 140px;
+    background: var(--bg-elevated); border: 1px solid var(--separator);
+    border-radius: var(--radius-m); box-shadow: var(--shadow-card);
+    overflow: hidden;
+}
+.export__menu button {
+    appearance: none; border: 0; background: transparent; text-align: left;
+    font-family: inherit; font-size: var(--text-subhead); color: var(--label-primary);
+    padding: var(--sp-3) var(--sp-4); cursor: pointer; min-height: 44px;
+}
+.export__menu button:hover { background: var(--fill-quaternary); }
 
 .form { display: flex; flex-direction: column; gap: var(--sp-4); }
 .form__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--sp-4); }
