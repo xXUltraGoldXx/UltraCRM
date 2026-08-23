@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Company;
 use App\Entity\Contact;
+use App\Service\CustomFieldValidator;
 use App\Entity\Deal;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -49,7 +50,9 @@ final class ExportController extends AbstractController
         'verhandlung' => 'Verhandlung', 'gewonnen' => 'Gewonnen', 'verloren' => 'Verloren',
     ];
 
-    public function __construct(private readonly EntityManagerInterface $em)
+    public function __construct(private readonly EntityManagerInterface $em,
+        private readonly CustomFieldValidator $customFields,
+    )
     {
     }
 
@@ -105,12 +108,19 @@ final class ExportController extends AbstractController
             $qb->andWhere('c.department LIKE :department')->setParameter('department', '%' . $department . '%');
         }
 
+        // Zusatzfelder hinten anhaengen — sonst fehlt im Export genau das,
+        // wofuer sie angelegt wurden. Reihenfolge wie in der Verwaltung.
+        $zusatz = $this->customFields->definitionen('contact', $this->mandantDesBenutzers());
+
         $kopf = [
             'Vorname', 'Nachname', 'Firma', 'Position', 'Abteilung', 'Hauptkontakt',
             'E-Mail', 'Telefon', 'Status', 'Herkunft',
             'Einwilligung erteilt am', 'Einwilligung widerrufen am',
             'Darf kontaktiert werden', 'Erfasst am',
         ];
+        foreach ($zusatz as $feld) {
+            $kopf[] = $feld->getLabel();
+        }
 
         $zeilen = [];
         foreach ($qb->getQuery()->toIterable() as $k) {
@@ -131,6 +141,10 @@ final class ExportController extends AbstractController
                 $k->isContactable() ? 'Ja' : 'Nein',
                 $k->getCreatedAt()->format('d.m.Y H:i'),
             ];
+
+            foreach ($zusatz as $feld) {
+                $zeilen[array_key_last($zeilen)][] = $this->zusatzwert($k->getCustomData(), $feld);
+            }
         }
 
         return [$kopf, $zeilen];
@@ -277,5 +291,28 @@ final class ExportController extends AbstractController
         $antwort->headers->set('Content-Disposition', sprintf('attachment; filename="%s"', $dateiname));
 
         return $antwort;
+    }
+
+    /** Mandant des angemeldeten Benutzers — Grundlage der Feld-Definitionen. */
+    private function mandantDesBenutzers(): ?\App\Entity\Tenant
+    {
+        $benutzer = $this->getUser();
+
+        return $benutzer instanceof \App\Entity\User ? $benutzer->getTenant() : null;
+    }
+
+    /** Zusatzwert lesbar machen: Ja/Nein statt true/false, leer statt null. */
+    private function zusatzwert(?array $daten, \App\Entity\CustomFieldDefinition $feld): ?string
+    {
+        $wert = $daten[$feld->getFieldKey()] ?? null;
+        if ($wert === null || $wert === '') {
+            return null;
+        }
+
+        if ($feld->getType() === 'janein') {
+            return $wert ? 'Ja' : 'Nein';
+        }
+
+        return (string) $wert;
     }
 }

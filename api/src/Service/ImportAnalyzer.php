@@ -86,7 +86,7 @@ final class ImportAnalyzer
      * Vorschau fuer Schritt 1: Kopfzeile, die ersten Datenzeilen und ein
      * Zuordnungsvorschlag je Spalte.
      */
-    public function analyze(UploadedFile $file): array
+    public function analyze(UploadedFile $file, array $zusatzfelder = []): array
     {
         $data = $this->read($file);
 
@@ -94,7 +94,7 @@ final class ImportAnalyzer
             'headers' => $data['headers'],
             'previewRows' => array_slice($data['rows'], 0, self::PREVIEW_ROWS),
             'totalRows' => count($data['rows']),
-            'suggestions' => $this->suggestMapping($data['headers']),
+            'suggestions' => $this->suggestMapping($data['headers'], $zusatzfelder),
         ];
     }
 
@@ -106,9 +106,12 @@ final class ImportAnalyzer
      * @param string[] $headers
      * @return array<int, string>
      */
-    public function suggestMapping(array $headers): array
+    public function suggestMapping(array $headers, array $zusatzfelder = []): array
     {
-        static $lookup = null;
+        // Kein static-Cache mehr: die Zusatzfelder unterscheiden sich je
+        // Mandant, ein einmal aufgebautes Verzeichnis waere fuer den
+        // naechsten Mandanten falsch.
+        $lookup = null;
         if ($lookup === null) {
             $lookup = [];
             foreach (self::SYNONYMS as $feld => $synonyme) {
@@ -117,6 +120,13 @@ final class ImportAnalyzer
                 }
                 // Das Zielfeld selbst (z.B. "firstName") ebenfalls erkennen.
                 $lookup[$this->normalize($feld)] = $feld;
+            }
+
+            // Selbst angelegte Felder: Bezeichnung UND Schluessel erkennen,
+            // damit eine Spalte "Kundennummer" ebenso trifft wie "kundennummer".
+            foreach ($zusatzfelder as $zf) {
+                $lookup[$this->normalize($zf->getLabel())] = 'custom.' . $zf->getFieldKey();
+                $lookup[$this->normalize($zf->getFieldKey())] = 'custom.' . $zf->getFieldKey();
             }
         }
 

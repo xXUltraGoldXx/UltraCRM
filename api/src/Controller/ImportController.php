@@ -6,6 +6,7 @@ use App\Entity\Company;
 use App\Entity\Contact;
 use App\Entity\Tenant;
 use App\Entity\User;
+use App\Service\CustomFieldValidator;
 use App\Service\ImportAnalyzer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -44,6 +45,7 @@ final class ImportController extends AbstractController
         private readonly Security $security,
         private readonly ImportAnalyzer $analyzer,
         private readonly ValidatorInterface $validator,
+        private readonly CustomFieldValidator $customFields,
     ) {
     }
 
@@ -61,7 +63,11 @@ final class ImportController extends AbstractController
         }
 
         try {
-            $ergebnis = $this->analyzer->analyze($file);
+            $benutzerA = $this->security->getUser();
+            $ergebnis = $this->analyzer->analyze(
+                $file,
+                $this->customFields->definitionen('contact', $benutzerA instanceof User ? $benutzerA->getTenant() : null),
+            );
         } catch (\RuntimeException $e) {
             return $this->fehler($e->getMessage(), 422);
         }
@@ -108,9 +114,19 @@ final class ImportController extends AbstractController
         // dasselbe Feld, gilt die erste — der Rest wurde vom Nutzer
         // versehentlich doppelt zugeordnet.
         $indexJeFeld = [];
+        $indexJeZusatzfeld = [];
         foreach (array_values($mapping) as $i => $feld) {
             if (in_array($feld, ImportAnalyzer::TARGET_FIELDS, true) && !isset($indexJeFeld[$feld])) {
                 $indexJeFeld[$feld] = $i;
+                continue;
+            }
+
+            // Selbst angelegte Felder kommen als "custom.<schluessel>".
+            if (is_string($feld) && str_starts_with($feld, 'custom.')) {
+                $schluessel = substr($feld, 7);
+                if (!isset($indexJeZusatzfeld[$schluessel])) {
+                    $indexJeZusatzfeld[$schluessel] = $i;
+                }
             }
         }
 
@@ -147,6 +163,27 @@ final class ImportController extends AbstractController
             $kontakt->setDepartment($wert($zeile, 'department'));
             $kontakt->setStatus('neu');
             $kontakt->setSource('import');
+
+            // Zusatzfelder uebernehmen und gegen ihre Definition pruefen —
+            // beim Import gelten dieselben Regeln wie beim Anlegen von Hand,
+            // sonst waere der Import ein Weg an der Pruefung vorbei.
+            if ($indexJeZusatzfeld !== []) {
+                $roh = [];
+                foreach ($indexJeZusatzfeld as $schluessel => $spalte) {
+                    $v = trim((string) ($zeile[$spalte] ?? ''));
+                    if ($v !== '') {
+                        $roh[$schluessel] = $v;
+                    }
+                }
+
+                $geprueft = $this->customFields->pruefen($roh, 'contact', $tenant);
+                if ($geprueft['fehler'] !== []) {
+                    $fehlerListe[] = ['row' => $zeilennummer, 'reason' => implode(' ', $geprueft['fehler'])];
+                    continue;
+                }
+
+                $kontakt->setCustomData($geprueft['werte']);
+            }
             // DSGVO, zwingend (TODO.md A11): KEINE Einwilligung setzen.
             // consentGivenAt/consentText bleiben leer — ein Import ist keine
             // Einwilligung und darf nicht als Umweg um die Einwilligungspflicht
