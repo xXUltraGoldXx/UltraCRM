@@ -96,17 +96,18 @@ async function personSpeichern() {
 /* Hauptansprechpartner umsetzen: der bisherige verliert die Markierung,
    damit es immer genau einen gibt. */
 async function alsHauptansprechpartner(k) {
+    // Ein einziger Aufruf: der Server setzt den bisherigen Hauptkontakt in
+    // derselben Transaktion zurueck. Frueher liefen dafuer mehrere PATCHes
+    // parallel — schlug einer fehl, blieb ein zerrissener Stand zurueck.
     try {
-        const bisher = kontakte.value.filter((x) => x.primaryContact && x.id !== k.id);
-        await Promise.all([
-            ...bisher.map((x) => api.patch(`/contacts/${x.id}`, { primaryContact: false },
-                { headers: { 'Content-Type': 'application/merge-patch+json' } })),
-            api.patch(`/contacts/${k.id}`, { primaryContact: true },
-                { headers: { 'Content-Type': 'application/merge-patch+json' } }),
-        ]);
-        await laden();
+        await api.patch(`/contacts/${k.id}`, { primaryContact: true },
+            { headers: { 'Content-Type': 'application/merge-patch+json' } });
     } catch (e) {
         fehler.value = 'Die Änderung hat nicht geklappt.';
+    } finally {
+        // Immer neu laden — auch im Fehlerfall, damit der echte Serverstand
+        // sichtbar wird statt eines geratenen.
+        await laden();
     }
 }
 

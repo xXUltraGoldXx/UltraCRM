@@ -47,11 +47,18 @@ final class MailerFactory
             throw new \RuntimeException('Es ist kein Server für den Versand hinterlegt.');
         }
 
+        $this->pruefeHost($host);
+
         $passwort = $this->secretBox->decrypt($setting->getSecret());
         if ($setting->getUsername() && $passwort === null) {
+            // Zwei sehr verschiedene Ursachen, zwei verschiedene Meldungen:
+            // gar kein Passwort hinterlegt ist der Normalfall beim Einrichten,
+            // ein unlesbares deutet auf einen gewechselten Anwendungsschlüssel.
             throw new \RuntimeException(
-                'Das gespeicherte Passwort konnte nicht gelesen werden. '
-                . 'Bitte erneut eintragen (das passiert, wenn sich der Anwendungsschlüssel geändert hat).'
+                $setting->getSecret() === null || $setting->getSecret() === ''
+                    ? 'Für diesen Benutzernamen ist kein Passwort hinterlegt. Bitte eines eintragen.'
+                    : 'Das gespeicherte Passwort konnte nicht entschlüsselt werden. '
+                      . 'Bitte erneut eintragen (das passiert, wenn sich der Anwendungsschlüssel geändert hat).'
             );
         }
 
@@ -65,6 +72,40 @@ final class MailerFactory
         );
 
         return new Mailer(Transport::fromDsn($dsn));
+    }
+
+    /**
+     * Verhindert, dass ueber die Mail-Einstellung interne Adressen
+     * angesprochen werden (SSRF, Review-Befund 45). Ein Mailserver steht im
+     * Internet — Loopback, private Netze und Cloud-Metadaten haben dort
+     * nichts zu suchen.
+     */
+    private function pruefeHost(string $host): void
+    {
+        if (filter_var($host, \FILTER_VALIDATE_IP)) {
+            $oeffentlich = filter_var(
+                $host,
+                \FILTER_VALIDATE_IP,
+                \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE
+            );
+            if ($oeffentlich === false) {
+                throw new \RuntimeException('Diese Serveradresse ist nicht zulässig.');
+            }
+
+            return;
+        }
+
+        if (!preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/i', $host)) {
+            throw new \RuntimeException('Der Servername sieht nicht wie ein gültiger Hostname aus.');
+        }
+
+        // Auch ein Name kann auf eine interne Adresse zeigen — deshalb wird
+        // aufgeloest und das Ergebnis geprueft.
+        foreach ((array) gethostbynamel($host) as $ip) {
+            if (filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE) === false) {
+                throw new \RuntimeException('Dieser Server verweist auf eine interne Adresse und ist nicht zulässig.');
+            }
+        }
     }
 
     public function absender(MailSetting $setting): string

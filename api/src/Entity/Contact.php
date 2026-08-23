@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\State\ContactProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -29,10 +30,12 @@ use Symfony\Component\Validator\Constraints as Assert;
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'contact')]
+#[ORM\Index(columns: ['confirm_token'], name: 'idx_contact_confirm_token')]
 #[ApiResource(
     operations: [
         new GetCollection(), new Get(),
-        new Post(), new Patch(),
+        new Post(processor: ContactProcessor::class),
+        new Patch(processor: ContactProcessor::class),
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ],
     normalizationContext: ['groups' => ['contact:read']],

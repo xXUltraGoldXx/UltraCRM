@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\IsGranted;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 /** Testversand, damit Fehlkonfiguration sofort auffaellt statt beim Kunden. */
@@ -22,6 +23,7 @@ final class MailController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly Security $security,
         private readonly MailerFactory $factory,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -52,9 +54,23 @@ final class MailController extends AbstractController
         );
 
         if ($fehler !== null) {
+            // Rohe Mailer-Meldungen koennen Serverpfade, DNS- und TLS-Details
+            // preisgeben — die gehoeren ins Log, nicht zum Client
+            // (Review-Befund 20). Nur die vom eigenen Code stammenden,
+            // bewusst formulierten Hinweise werden durchgereicht.
+            $this->logger->error('Testmail fehlgeschlagen', ['grund' => $fehler]);
+
+            $verstaendlich = str_starts_with($fehler, 'Es ist kein Server')
+                || str_starts_with($fehler, 'Für diesen Benutzernamen')
+                || str_starts_with($fehler, 'Das gespeicherte Passwort')
+                || str_starts_with($fehler, 'Diese Serveradresse')
+                || str_starts_with($fehler, 'Der Servername')
+                || str_starts_with($fehler, 'Dieser Server verweist');
+
             return new JsonResponse([
-                'error' => 'Der Versand hat nicht geklappt.',
-                'details' => mb_substr($fehler, 0, 300),
+                'error' => $verstaendlich
+                    ? $fehler
+                    : 'Der Versand hat nicht geklappt. Bitte Servername, Port und Zugangsdaten prüfen.',
             ], 502);
         }
 

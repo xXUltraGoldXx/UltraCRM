@@ -107,6 +107,12 @@ final class PrivacyController extends AbstractController
      * Loeschung nach Art. 17. Der Kontakt und alles, was an ihm haengt,
      * verschwindet; zurueck bleibt nur ein Nachweis OHNE Personendaten.
      */
+    /**
+     * Nur Administratoren. Die endgueltige Loeschung ist destruktiver als das
+     * normale Loeschen eines Kontakts — sie darf nicht schwaecher geschuetzt
+     * sein als jenes (Review-Befund, Schwere 50).
+     */
+    #[IsGranted('ROLE_ADMIN')]
     #[Route('/api/privacy/contacts/{id}/erase', name: 'privacy_erase', methods: ['POST'])]
     public function erase(int $id, Request $request): Response
     {

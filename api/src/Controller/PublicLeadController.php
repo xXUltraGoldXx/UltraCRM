@@ -123,10 +123,26 @@ final class PublicLeadController extends AbstractPublicController
                 . $link . "\n\nWenn Sie das nicht waren, ignorieren Sie diese Nachricht einfach.\n",
             );
 
-            // Scheitert der Versand, bleibt der Kontakt bestehen — aber ohne
-            // offenen Token, sonst waere er dauerhaft blockiert.
+            // Scheitert der Versand, bleibt der Token bestehen. Ihn zu
+            // loeschen wuerde den Kontakt sofort kontaktierbar machen,
+            // OHNE dass je jemand bestaetigt hat — genau das, wogegen das
+            // Double-Opt-in schuetzt (Review-Befund, Schwere 58).
+            // Stattdessen wird der Fehlschlag als Aktivitaet sichtbar
+            // gemacht, damit ihn jemand bearbeiten kann.
             if ($fehler !== null) {
-                $kontakt->setConfirmToken(null);
+                $this->em->persist(
+                    (new Activity())
+                        ->setTenant($form->getTenant())
+                        ->setType('aufgabe')
+                        ->setSubject('Bestätigungsmail konnte nicht zugestellt werden')
+                        ->setBody(
+                            'An ' . $kontakt->getEmail() . ' ließ sich keine Bestätigung senden. '
+                            . 'Der Kontakt bleibt so lange nicht für Werbung freigegeben. '
+                            . "Grund: " . mb_substr($fehler, 0, 300)
+                        )
+                        ->setDueAt(new \DateTimeImmutable('+1 day'))
+                        ->setContact($kontakt)
+                );
             }
         }
 
@@ -140,8 +156,22 @@ final class PublicLeadController extends AbstractPublicController
      * klickt in seinem Mailprogramm.
      */
     #[Route('/api/public/leads/confirm/{token}', name: 'public_lead_confirm', methods: ['GET'])]
-    public function confirm(string $token): Response
+    public function confirm(string $token, Request $request): Response
     {
+        // Auch hier begrenzen: die Token-Suche laeuft ohne Mandantenfilter
+        // ueber die gesamte Tabelle. Ohne Limit koennte man mit zufaelligen
+        // Tokens beliebig teure Abfragen ausloesen (Review-Befund 55).
+        $ipHash = hash('sha256', ($request->getClientIp() ?? 'unbekannt') . '|' . $this->appSecret);
+        if ($this->zuVieleVersuche($ipHash, 20)) {
+            return new Response(
+                $this->seite('Zu viele Versuche', 'Bitte versuchen Sie es später noch einmal.'),
+                429,
+                ['Content-Type' => 'text/html; charset=utf-8'],
+            );
+        }
+        $this->em->persist(new LeadAttempt($ipHash));
+        $this->em->flush();
+
         $filters = $this->em->getFilters();
         $warAn = $filters->isEnabled('tenant_filter');
         if ($warAn) {
@@ -190,15 +220,16 @@ final class PublicLeadController extends AbstractPublicController
         );
     }
 
-    private function zuVieleVersuche(string $ipHash): bool
+    private function zuVieleVersuche(string $ipHash, ?int $grenze = null): bool
     {
+        $grenze ??= self::MAX_ATTEMPTS;
         $seit = new \DateTimeImmutable('-' . self::WINDOW_MINUTES . ' minutes');
 
         $anzahl = (int) $this->em->createQuery(
             'SELECT COUNT(a.id) FROM App\Entity\LeadAttempt a WHERE a.ipHash = :h AND a.createdAt >= :seit'
         )->setParameter('h', $ipHash)->setParameter('seit', $seit)->getSingleScalarResult();
 
-        return $anzahl >= self::MAX_ATTEMPTS;
+        return $anzahl >= $grenze;
     }
 
     private function formularZuToken(string $token): ?LeadForm
