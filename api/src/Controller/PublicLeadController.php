@@ -146,7 +146,14 @@ final class PublicLeadController extends AbstractPublicController
                 return new JsonResponse(['status' => 'ok'], 202);
             }
 
-            $link = sprintf('https://crm.ultragold.de/api/public/leads/confirm/%s', $token);
+            // Built from the incoming request instead of a hardcoded host:
+            // every installation serves its own confirmation links, and a
+            // wrong host here would send people to somebody else's system.
+            $link = sprintf(
+                '%s/api/public/leads/confirm/%s',
+                rtrim($request->getSchemeAndHttpHost(), '/'),
+                $token
+            );
             $fehler = $this->mailer->send(
                 $setting,
                 $kontakt->getEmail(),

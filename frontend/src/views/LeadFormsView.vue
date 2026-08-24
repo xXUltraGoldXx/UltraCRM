@@ -58,7 +58,7 @@ document.getElementById('ug-lead').addEventListener('submit', async (e) => {
   e.preventDefault();
   const d = Object.fromEntries(new FormData(e.target));
   d.consent = e.target.consent.checked;
-  const r = await fetch('https://crm.ultragold.de/api/public/leads', {
+  const r = await fetch('${window.location.origin}/api/public/leads', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d),
   });
   e.target.innerHTML = r.ok
