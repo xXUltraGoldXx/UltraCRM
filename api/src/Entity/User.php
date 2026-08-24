@@ -20,21 +20,6 @@ use Symfony\Component\Serializer\Attribute\Groups;
 #[ApiResource(
     operations: [
         new GetCollection(security: "is_granted('ROLE_ADMIN')"),
-        // Modul #8 Kalender: Mitarbeiter-Dropdown im AppointmentModal braucht eine
-        // Liste zum Zuweisen, aber die normale GetCollection ist bewusst ROLE_ADMIN-
-        // only (Benutzerverwaltung #4) -- ein Mitarbeiter mit calendar.manage, aber
-        // ohne ROLE_ADMIN, wuerde sonst 403 bekommen. Eigene, engere Route statt die
-        // bestehende Sicherheit von #4 aufzuweichen: nur id+displayName (eigene
-        // Gruppe user:picker, kein email/roles/permissions), jedem Authentifizierten
-        // zugaenglich. MUSS vor Get(/users/{id}) stehen: {id} hat kein \d+-
-        // Requirement, sonst faengt die Item-Route "/users/picker" faelschlich als
-        // id="picker" ab (404 durch Item-Provider statt korrekte Collection).
-        new GetCollection(
-            uriTemplate: '/users/picker',
-            paginationEnabled: false,
-            security: "is_granted('IS_AUTHENTICATED_FULLY')",
-            normalizationContext: ['groups' => ['user:picker']],
-        ),
         new Get(security: "is_granted('ROLE_ADMIN') or object == user"),
         new Post(security: "is_granted('ROLE_ADMIN')", processor: \App\State\UserPasswordProcessor::class),
         new Patch(security: "is_granted('ROLE_ADMIN') or object == user", processor: \App\State\UserPasswordProcessor::class),
@@ -48,7 +33,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read', 'user:picker'])]
+    #[Groups(['user:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180)]
@@ -56,7 +41,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $username = null;
 
     #[ORM\Column(length: 120)]
-    #[Groups(['user:read', 'user:write', 'submission:read', 'user:picker'])]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $displayName = null;
 
     #[ORM\Column(length: 180, nullable: true)]
@@ -67,7 +52,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write'])]
     private array $roles = [];
 
-    /** Feingranulare Modul-Rechte, z.B. ['customers.manage','submissions.view'] */
+    /** Feingranulare Rechte, z.B. ['contacts.manage', 'privacy.view'] — siehe Permissions.php */
     #[ORM\Column(type: 'json')]
     #[Groups(['user:read', 'user:write'])]
     private array $permissions = [];
