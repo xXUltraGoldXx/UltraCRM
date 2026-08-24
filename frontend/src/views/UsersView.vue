@@ -12,6 +12,7 @@ import UiSheet from '../components/ui/UiSheet.vue';
 const auth = useAuthStore();
 const benutzer = ref([]);
 const katalog = ref([]);
+const gruppen = ref([]);
 const fehler = ref('');
 const hinweis = ref('');
 const blattOffen = ref(false);
@@ -20,18 +21,20 @@ const bearbeiteId = ref(null);
 
 const leer = () => ({
     username: '', displayName: '', email: '',
-    plainPassword: '', rolleAdmin: false, permissions: [],
+    plainPassword: '', rolleAdmin: false, permissions: [], permissionGroup: null,
 });
 const entwurf = ref(leer());
 
 async function laden() {
     try {
-        const [u, k] = await Promise.all([
+        const [u, k, g] = await Promise.all([
             api.get('/users'),
             api.get('/permissions'),
+            api.get('/permission_groups'),
         ]);
         benutzer.value = u.data['hydra:member'] ?? u.data.member ?? [];
         katalog.value = k.data.gruppen ?? [];
+        gruppen.value = g.data['hydra:member'] ?? g.data.member ?? [];
         fehler.value = '';
     } catch (e) {
         fehler.value = e?.response?.status === 403
@@ -40,6 +43,12 @@ async function laden() {
     }
 }
 onMounted(laden);
+
+function gruppenName(iri) {
+    if (!iri) return '';
+    const id = String(iri).split('/').pop();
+    return gruppen.value.find((g) => String(g.id) === id)?.name ?? '';
+}
 
 function neu() {
     bearbeiteId.value = null;
@@ -56,6 +65,7 @@ function bearbeiten(b) {
         plainPassword: '',
         rolleAdmin: (b.roles || []).includes('ROLE_ADMIN'),
         permissions: [...(b.permissions || [])],
+        permissionGroup: b.permissionGroup ?? null,
     };
     blattOffen.value = true;
 }
@@ -75,6 +85,7 @@ async function speichern() {
             displayName: entwurf.value.displayName,
             roles: entwurf.value.rolleAdmin ? ['ROLE_ADMIN'] : ['ROLE_USER'],
             permissions: entwurf.value.permissions,
+            permissionGroup: entwurf.value.permissionGroup,
         };
         if (entwurf.value.email) nutzlast.email = entwurf.value.email;
         // Leeres Feld heisst "Passwort unveraendert lassen" — sonst wuerde
@@ -103,6 +114,7 @@ async function speichern() {
 function rechteText(b) {
     if ((b.roles || []).includes('ROLE_SUPERADMIN')) return 'Superadmin — alles';
     if ((b.roles || []).includes('ROLE_ADMIN')) return 'Administrator — alles';
+    if (b.permissionGroup) return `Gruppe „${gruppenName(b.permissionGroup)}“`;
     const n = (b.permissions || []).length;
     return n ? `${n} ${n === 1 ? 'Recht' : 'Rechte'}` : 'keine Rechte';
 }
@@ -150,15 +162,29 @@ function rechteText(b) {
                 <span>Administrator — darf alles im Mandanten, einzelne Rechte entfallen</span>
             </label>
 
-            <div v-if="!entwurf.rolleAdmin" class="rechte">
-                <div v-for="g in katalog" :key="g.gruppe" class="gruppe">
-                    <p class="t-caption">{{ g.gruppe }}</p>
-                    <label v-for="r in g.rechte" :key="r.schluessel" class="haken">
-                        <input type="checkbox" :checked="entwurf.permissions.includes(r.schluessel)"
-                               @change="umschalten(r.schluessel)" />
-                        <span>{{ r.text }}</span>
-                    </label>
-                </div>
+            <label v-if="!entwurf.rolleAdmin" class="feld">
+                <span class="feld__label">Berechtigungsgruppe</span>
+                <select v-model="entwurf.permissionGroup">
+                    <option :value="null">keine Gruppe — einzelne Rechte unten gelten</option>
+                    <option v-for="g in gruppen" :key="g.id" :value="`/api/permission_groups/${g.id}`">{{ g.name }}</option>
+                </select>
+            </label>
+            <p v-if="!entwurf.rolleAdmin && entwurf.permissionGroup" class="t-footnote muted">
+                Es gilt ausschließlich die Gruppe „{{ gruppenName(entwurf.permissionGroup) }}“ — die einzelnen Häkchen
+                unten sind deaktiviert und werden nicht berücksichtigt, solange eine Gruppe zugewiesen ist.
+            </p>
+
+            <div v-if="!entwurf.rolleAdmin" class="rechte" :class="{ 'rechte--inaktiv': !!entwurf.permissionGroup }">
+                <fieldset :disabled="!!entwurf.permissionGroup" class="rechte__fieldset">
+                    <div v-for="g in katalog" :key="g.gruppe" class="gruppe">
+                        <p class="t-caption">{{ g.gruppe }}</p>
+                        <label v-for="r in g.rechte" :key="r.schluessel" class="haken">
+                            <input type="checkbox" :checked="entwurf.permissions.includes(r.schluessel)"
+                                   @change="umschalten(r.schluessel)" />
+                            <span>{{ r.text }}</span>
+                        </label>
+                    </div>
+                </fieldset>
             </div>
         </UiSheet>
     </div>
@@ -171,11 +197,24 @@ function rechteText(b) {
 .zeile p { margin: 0; }
 .name { font-size: var(--text-body); font-weight: 600; display: flex; align-items: center; gap: var(--sp-2); }
 
+.feld { display: flex; flex-direction: column; gap: var(--sp-2); }
+.feld__label { font-size: var(--text-footnote); font-weight: 600; color: var(--label-secondary); }
+select {
+    font-family: inherit; font-size: var(--text-body); color: var(--label-primary);
+    background: var(--bg-input); border: 1px solid var(--separator);
+    border-radius: var(--radius-m); padding: 11px 14px; min-height: 44px;
+}
+
 .haken { display: flex; align-items: flex-start; gap: var(--sp-3); font-size: var(--text-subhead); min-height: 40px; cursor: pointer; }
 .haken input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); flex: none; }
 
 .rechte { display: flex; flex-direction: column; gap: var(--sp-4); }
 .gruppe .t-caption { margin: 0 0 var(--sp-1); }
+.rechte__fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+/* Deaktiviert durch Gruppenzuweisung — deutlich als wirkungslos markiert,
+   statt sie kommentarlos verschwinden zu lassen. */
+.rechte--inaktiv { opacity: .45; }
+.rechte--inaktiv .haken { cursor: not-allowed; }
 
 @media (max-width: 700px) {
     .head :deep(.btn) { width: 100%; min-height: 46px; }

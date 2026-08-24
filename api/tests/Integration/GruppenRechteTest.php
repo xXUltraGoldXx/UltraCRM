@@ -162,6 +162,69 @@ final class GruppenRechteTest extends IntegrationTestCase
         );
     }
 
+    // ------------------------------------------------------------- Katalog
+
+    /**
+     * Die Oberfläche baut ihre Schalter aus diesem Katalog. Nennt er einen
+     * Bereich oder eine Stufe, die zu keinem Recht führt, entstehen dort
+     * Schalter ohne Wirkung — deshalb hängt das hier an einem Test.
+     */
+    public function testKatalogNenntBereicheMitIhrenStufen(): void
+    {
+        $a = $this->mandant('Mandant A', 'a');
+        $admin = $this->benutzer($a, 'admin', [], ['ROLE_ADMIN']);
+
+        $inhalt = $this->inhalt($this->anfrage('GET', '/api/permissions', $admin));
+
+        self::assertArrayHasKey('bereiche', $inhalt);
+        self::assertArrayHasKey('stufenNamen', $inhalt);
+
+        $jeSchluessel = [];
+        foreach ($inhalt['bereiche'] as $bereich) {
+            self::assertNotSame('', $bereich['name'], 'Jeder Bereich braucht einen Klartext.');
+            $jeSchluessel[$bereich['schluessel']] = $bereich['stufen'];
+        }
+
+        self::assertSame(['lesen', 'schreiben', 'loeschen'], $jeSchluessel['contacts'] ?? null);
+        self::assertSame(['lesen'], $jeSchluessel['reports'] ?? null, 'Eine Auswertung lässt sich nicht schreiben.');
+        self::assertArrayNotHasKey('users', $jeSchluessel, 'Benutzerverwaltung bleibt Adminsache.');
+    }
+
+    public function testKatalogIstNurFuerAdmins(): void
+    {
+        $a = $this->mandant('Mandant A', 'a');
+        $mitarbeiter = $this->benutzer($a, 'mitarbeiter', ['contacts.view']);
+
+        self::assertSame(403, $this->anfrage('GET', '/api/permissions', $mitarbeiter)->getStatusCode());
+    }
+
+    public function testGruppenverwaltungIstNurFuerAdmins(): void
+    {
+        $a = $this->mandant('Mandant A', 'a');
+        $mitarbeiter = $this->benutzer($a, 'mitarbeiter', ['contacts.view', 'contacts.manage']);
+
+        self::assertSame(403, $this->anfrage('GET', '/api/permission_groups', $mitarbeiter)->getStatusCode());
+        self::assertSame(403, $this->anfrage('POST', '/api/permission_groups', $mitarbeiter, [
+            'name' => 'Selbst gebaut',
+            'rechte' => ['contacts' => ['loeschen' => true]],
+        ])->getStatusCode());
+    }
+
+    public function testFremdeGruppeIstUnsichtbar(): void
+    {
+        $a = $this->mandant('Mandant A', 'a');
+        $b = $this->mandant('Mandant B', 'b');
+        $adminB = $this->benutzer($b, 'adminb', [], ['ROLE_ADMIN']);
+
+        $inhalt = $this->inhalt($this->anfrage('GET', '/api/permission_groups', $adminB));
+
+        // Mandant B sieht ausschliesslich seine eigenen vier Vorlagen.
+        self::assertSame(4, $inhalt['totalItems']);
+        foreach ($inhalt['member'] as $gruppe) {
+            self::assertNotSame('Mandant A', $gruppe['name']);
+        }
+    }
+
     // ------------------------------------------------------------- Helfer
 
     private function gruppe(Tenant $mandant, string $name, array $rechte): PermissionGroup

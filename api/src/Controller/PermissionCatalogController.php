@@ -37,6 +37,28 @@ final class PermissionCatalogController extends AbstractController
             ];
         }
 
-        return new JsonResponse(['gruppen' => $gruppen]);
+        // Bereiche fuer die Berechtigungsgruppen (A14). Der Katalog ist die
+        // einzige Quelle: die Oberflaeche baut ihre Schalter daraus, statt
+        // die Liste ein zweites Mal zu pflegen. Ein Bereich zeigt nur die
+        // Stufen, die es dort wirklich gibt — eine Auswertung laesst sich
+        // nicht "schreiben".
+        $bereiche = [];
+        foreach (Permissions::BEREICHE as $schluessel => $stufen) {
+            $bereiche[] = [
+                'schluessel' => $schluessel,
+                'name' => Permissions::BEREICH_NAMEN[$schluessel] ?? $schluessel,
+                'stufen' => $stufen,
+            ];
+        }
+
+        return new JsonResponse([
+            'gruppen' => $gruppen,
+            'bereiche' => $bereiche,
+            'stufenNamen' => [
+                'lesen' => 'Lesen',
+                'schreiben' => 'Schreiben',
+                'loeschen' => 'Löschen',
+            ],
+        ]);
     }
 }

@@ -16,6 +16,7 @@ import ImportView from '../views/ImportView.vue';
 import ReportsView from '../views/ReportsView.vue';
 import TenantsView from '../views/TenantsView.vue';
 import UsersView from '../views/UsersView.vue';
+import PermissionGroupsView from '../views/PermissionGroupsView.vue';
 import CustomFieldsView from '../views/CustomFieldsView.vue';
 import MailSettingsView from '../views/MailSettingsView.vue';
 import DuplicatesView from '../views/DuplicatesView.vue';
@@ -44,6 +45,7 @@ const routes = [
             { path: 'auswertung', component: ReportsView },
             { path: 'mandanten', component: TenantsView },
             { path: 'benutzer', component: UsersView },
+            { path: 'gruppen', component: PermissionGroupsView },
             { path: 'zusatzfelder', component: CustomFieldsView },
             { path: 'versand', component: MailSettingsView },
             { path: 'dubletten', component: DuplicatesView },
