@@ -37,7 +37,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Get(security: "is_granted('PERM', 'contacts.view')"),
         new Post(security: "is_granted('PERM', 'contacts.manage')", processor: ContactProcessor::class),
         new Patch(security: "is_granted('PERM', 'contacts.manage')", processor: ContactProcessor::class),
-        new Delete(security: "is_granted('ROLE_ADMIN')"),
+        new Delete(security: "is_granted('PERM', 'contacts.delete')"),
     ],
     normalizationContext: ['groups' => ['contact:read']],
     denormalizationContext: ['groups' => ['contact:write']],

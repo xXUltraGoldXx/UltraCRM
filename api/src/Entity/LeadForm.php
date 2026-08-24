@@ -27,7 +27,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Get(security: "is_granted('PERM', 'leadforms.manage')"),
         new Post(security: "is_granted('PERM', 'leadforms.manage')"),
         new Patch(security: "is_granted('PERM', 'leadforms.manage')"),
-        new Delete(security: "is_granted('ROLE_ADMIN')"),
+        new Delete(security: "is_granted('PERM', 'leadforms.delete')"),
     ],
     normalizationContext: ['groups' => ['leadform:read']],
     denormalizationContext: ['groups' => ['leadform:write']],

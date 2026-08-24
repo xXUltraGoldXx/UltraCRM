@@ -85,7 +85,7 @@ final class DuplicateController extends AbstractController
         // dieselbe Huerde haben, sonst laeuft der Loeschschutz ins Leere
         // (Analyse.md C7: Rechte an der Wirkung ausrichten, nicht am Ort).
         $this->denyAccessUnlessGranted('PERM', 'contacts.manage');
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        $this->denyAccessUnlessGranted('PERM', 'contacts.delete');
 
         $mandant = $this->mandant();
         if ($mandant === null) {

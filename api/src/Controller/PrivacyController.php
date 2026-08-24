@@ -132,7 +132,11 @@ final class PrivacyController extends AbstractController
     #[Route('/api/privacy/contacts/{id}/erase', name: 'privacy_erase', methods: ['POST'])]
     public function erase(int $id, Request $request): Response
     {
-        $this->denyAccessUnlessGranted('PERM', 'privacy.manage');
+        // Endgueltige Loeschung eines Menschen (Art. 17): eigener Schalter.
+        // Vergeben wird er von keiner Vorlage — nur das Admin-Konto kommt
+        // durch, bis jemand ihn bewusst setzt (Alexander: "einstellbar die
+        // Berechtigung und ja erstmal nur admin").
+        $this->denyAccessUnlessGranted('PERM', 'privacy.delete');
 
         $daten = json_decode($request->getContent(), true);
         $grund = trim((string) ($daten['reason'] ?? ''));

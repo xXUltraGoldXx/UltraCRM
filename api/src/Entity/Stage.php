@@ -34,7 +34,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Patch(security: "is_granted('PERM', 'pipelines.manage')", processor: StageProcessor::class),
         // Loeschen ist unumkehrbar und nimmt bei einer Pipeline alle Phasen
         // mit — dieselbe Huerde wie bei Kontakt, Firma und Vorgang (C17).
-        new Delete(security: "is_granted('ROLE_ADMIN')", processor: PipelineRemoveProcessor::class),
+        new Delete(security: "is_granted('PERM', 'pipelines.delete')", processor: PipelineRemoveProcessor::class),
     ],
     normalizationContext: ['groups' => ['stage:read']],
     denormalizationContext: ['groups' => ['stage:write']],
