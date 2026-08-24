@@ -16,6 +16,7 @@ import ReportsView from '../views/ReportsView.vue';
 import TenantsView from '../views/TenantsView.vue';
 import UsersView from '../views/UsersView.vue';
 import CustomFieldsView from '../views/CustomFieldsView.vue';
+import DuplicatesView from '../views/DuplicatesView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 
 // Platzhalter sind bewusst benannt: sie sagen, was dort entsteht, statt eine
@@ -41,6 +42,7 @@ const routes = [
             { path: 'mandanten', component: TenantsView },
             { path: 'benutzer', component: UsersView },
             { path: 'zusatzfelder', component: CustomFieldsView },
+            { path: 'dubletten', component: DuplicatesView },
         ],
     },
 ];

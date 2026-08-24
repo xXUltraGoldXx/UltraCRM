@@ -32,6 +32,7 @@ const alleNav = [
     { to: '/formulare', icon: 'search', label: 'Lead-Formulare', recht: 'leadforms.manage' },
     { to: '/einwilligungen', icon: 'consent', label: 'Einwilligungen', recht: 'privacy.view' },
     { to: '/import', icon: 'import', label: 'Import', recht: 'importexport.use' },
+    { to: '/dubletten', icon: 'search', label: 'Dubletten', recht: 'contacts.view' },
     { to: '/auswertung', icon: 'pipeline', label: 'Auswertung', recht: 'reports.view' },
 ];
 

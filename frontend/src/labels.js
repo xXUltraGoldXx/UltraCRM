@@ -42,6 +42,11 @@ export const QUELLE_LABEL = {
     sonstiges: 'Sonstiges',
 };
 
+export const SICHERHEIT_LABEL = {
+    sicher: 'Sicher',
+    moeglich: 'Möglich',
+};
+
 export const PHASE = {
     neu: 'Neu',
     qualifiziert: 'Qualifiziert',
