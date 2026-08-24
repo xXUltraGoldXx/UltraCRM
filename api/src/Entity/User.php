@@ -52,10 +52,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write'])]
     private array $roles = [];
 
-    /** Feingranulare Rechte, z.B. ['contacts.manage', 'privacy.view'] — siehe Permissions.php */
+    /**
+     * Feingranulare Rechte, z.B. ['contacts.manage', 'privacy.view'] — siehe
+     * Permissions.php.
+     *
+     * Rueckfallebene seit A14: Ist eine Berechtigungsgruppe gesetzt, gilt
+     * ausschliesslich diese. Das Array bleibt bestehen, damit
+     * Bestandsbenutzer im Moment der Umstellung nicht rechtelos dastehen.
+     */
     #[ORM\Column(type: 'json')]
     #[Groups(['user:read', 'user:write'])]
     private array $permissions = [];
+
+    /**
+     * Frei benannte Berechtigungsgruppe mit Rechten je Bereich (A14).
+     * Gesetzt schlaegt sie das `permissions`-Array — siehe Permissions::hat().
+     */
+    #[ORM\ManyToOne(targetEntity: PermissionGroup::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['user:read', 'user:write'])]
+    private ?PermissionGroup $permissionGroup = null;
 
     /** Gehashtes Passwort */
     #[ORM\Column]
@@ -167,6 +183,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getPermissions(): array
     {
         return $this->permissions;
+    }
+
+    public function getPermissionGroup(): ?PermissionGroup { return $this->permissionGroup; }
+
+    public function setPermissionGroup(?PermissionGroup $v): static
+    {
+        $this->permissionGroup = $v;
+
+        return $this;
     }
 
     public function setPermissions(array $permissions): static

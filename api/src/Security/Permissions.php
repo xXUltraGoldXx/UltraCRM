@@ -29,6 +29,74 @@ final class Permissions
     public const REPORTS_VIEW = 'reports.view';
     public const IMPORT_EXPORT = 'importexport.use';
 
+    /**
+     * Bereiche und die Stufen, die es dort tatsaechlich gibt — Grundlage der
+     * frei anlegbaren Berechtigungsgruppen (A14).
+     *
+     * Bewusst NICHT ueberall drei Stufen: Eine Auswertung laesst sich nicht
+     * "schreiben", ein Import nicht "loeschen". Ein Schalter ohne Wirkung
+     * waere eine Luege in der Oberflaeche — deshalb steht hier je Bereich,
+     * was er kennt.
+     *
+     * "contacts" umfasst Kontakte UND Firmen: die teilen sich seit Beginn
+     * dieselben Rechte, und sie zu trennen waere eine fachliche Aenderung,
+     * die niemand verlangt hat.
+     *
+     * @var array<string, list<string>>
+     */
+    public const BEREICHE = [
+        'contacts' => ['lesen', 'schreiben', 'loeschen'],
+        'deals' => ['lesen', 'schreiben', 'loeschen'],
+        'activities' => ['lesen', 'schreiben', 'loeschen'],
+        'pipelines' => ['schreiben', 'loeschen'],
+        'leadforms' => ['schreiben', 'loeschen'],
+        'privacy' => ['lesen', 'schreiben', 'loeschen'],
+        'reports' => ['lesen'],
+        'importexport' => ['lesen'],
+    ];
+
+    /** Klartext je Bereich fuer die Oberflaeche. */
+    public const BEREICH_NAMEN = [
+        'contacts' => 'Kontakte und Firmen',
+        'deals' => 'Vertrieb',
+        'activities' => 'Aktivitäten',
+        'pipelines' => 'Pipelines und Phasen',
+        'leadforms' => 'Lead-Formulare',
+        'privacy' => 'Datenschutz',
+        'reports' => 'Auswertung',
+        'importexport' => 'Import und Export',
+    ];
+
+    /**
+     * Uebersetzt Bereich + Stufe in den Rechte-Schluessel, mit dem das
+     * System seit jeher arbeitet. Gibt es die Kombination nicht, kommt null
+     * zurueck — der Schalter wird dann schlicht ignoriert.
+     */
+    public static function schluessel(string $bereich, string $stufe): ?string
+    {
+        return match ([$bereich, $stufe]) {
+            ['contacts', 'lesen'] => self::CONTACTS_VIEW,
+            ['contacts', 'schreiben'] => self::CONTACTS_MANAGE,
+            ['contacts', 'loeschen'] => 'contacts.delete',
+            ['deals', 'lesen'] => self::DEALS_VIEW,
+            ['deals', 'schreiben'] => self::DEALS_MANAGE,
+            ['deals', 'loeschen'] => 'deals.delete',
+            ['activities', 'lesen'] => self::ACTIVITIES_VIEW,
+            ['activities', 'schreiben'] => self::ACTIVITIES_MANAGE,
+            ['activities', 'loeschen'] => 'activities.delete',
+            ['pipelines', 'schreiben'] => self::PIPELINES_MANAGE,
+            ['pipelines', 'loeschen'] => 'pipelines.delete',
+            ['leadforms', 'schreiben'] => self::LEADFORMS_MANAGE,
+            ['leadforms', 'loeschen'] => 'leadforms.delete',
+            ['privacy', 'lesen'] => self::PRIVACY_VIEW,
+            ['privacy', 'schreiben'] => self::PRIVACY_MANAGE,
+            ['privacy', 'loeschen'] => 'privacy.delete',
+            ['reports', 'lesen'] => self::REPORTS_VIEW,
+            ['importexport', 'lesen'] => self::IMPORT_EXPORT,
+            default => null,
+        };
+    }
+
     /** Alle Rechte mit deutscher Bezeichnung — Grundlage der Oberflaeche. */
     public const KATALOG = [
         'Kontakte und Firmen' => [
@@ -94,7 +162,15 @@ final class Permissions
             return true;
         }
 
-        $eigene = $user->getPermissions();
+        // Erst die Berechtigungsgruppe (A14), dann die alte Rechteliste.
+        //
+        // Die Rueckfallebene bleibt bewusst bestehen, bis jeder Benutzer eine
+        // Gruppe hat: Wuerde hier sofort nur noch die Gruppe zaehlen, waeren
+        // im Moment der Umstellung alle Bestandsbenutzer ohne Rechte —
+        // einschliesslich derer, die gerade angemeldet sind.
+        $eigene = $user->getPermissionGroup()?->alsRechteSchluessel()
+            ?? $user->getPermissions();
+
         if (in_array($recht, $eigene, true)) {
             return true;
         }
