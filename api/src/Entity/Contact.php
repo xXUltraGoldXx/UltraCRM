@@ -57,6 +57,9 @@ class Contact implements TenantOwnedInterface
     /** Woher der Datensatz stammt — fuer die Auskunftspflicht. */
     public const SOURCES = ['formular', 'telefon', 'messe', 'empfehlung', 'eigene_recherche', 'import', 'sonstiges'];
 
+    /** Standardfrist fuer die Loeschvormerkung, wenn niemand eine eigene eintraegt. */
+    public const STANDARD_LOESCHFRIST = '+30 days';
+
     #[ORM\Id, ORM\GeneratedValue, ORM\Column]
     #[Groups(['contact:read'])]
     private ?int $id = null;
@@ -170,6 +173,15 @@ class Contact implements TenantOwnedInterface
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+
+        // "30 Tage, wenn nichts anderes eingestellt wird" (Alexander, 24.08.).
+        // Nur ein Vorschlag, keine automatische Loeschung: der Kontakt taucht
+        // damit in /api/privacy/due-deletions zur Pruefung auf, geloescht
+        // wird weiterhin nur von Hand ueber /erase. Gilt fuer jeden Weg, auf
+        // dem ein Kontakt entsteht (Formular, API, Import) — kommt ein Wert
+        // vom Client mit (contact:write), ueberschreibt der Denormalizer
+        // diesen Standard danach ganz regulaer.
+        $this->deleteAfter = new \DateTimeImmutable(self::STANDARD_LOESCHFRIST);
     }
 
     /**
