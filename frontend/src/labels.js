@@ -1,3 +1,22 @@
+// Technische Feldnamen aus dem Änderungsprotokoll sind für Anwender
+// nichtssagend — deckt Kontakt, Firma und Vorgang ab (siehe api/src/Entity/
+// Contact.php, Company.php, Deal.php). Unbekannte Feldnamen fallen in der
+// Anzeige auf den Rohwert zurück.
+export const FELDNAMEN = {
+    // Kontakt
+    firstName: 'Vorname', lastName: 'Nachname', email: 'E-Mail', phone: 'Telefon',
+    position: 'Position', department: 'Abteilung', status: 'Status', source: 'Herkunft',
+    company: 'Firma', notes: 'Notizen', primaryContact: 'Hauptkontakt',
+    consentGivenAt: 'Einwilligung erteilt', consentWithdrawnAt: 'Einwilligung widerrufen',
+    deleteAfter: 'Löschvormerkung',
+    // Firma
+    name: 'Name', street: 'Straße', zipCode: 'PLZ', city: 'Ort', website: 'Website',
+    // Vorgang
+    title: 'Titel', value: 'Wert', currency: 'Währung', stage: 'Phase',
+    contact: 'Kontakt', owner: 'Verantwortlich', expectedCloseAt: 'Erwarteter Abschluss',
+    lostReason: 'Verlustgrund',
+};
+
 export const ART = {
     anruf: 'Anruf',
     notiz: 'Notiz',

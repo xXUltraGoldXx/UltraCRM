@@ -8,6 +8,7 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
+import AenderungsProtokoll from '../components/AenderungsProtokoll.vue';
 import { ART } from '../labels.js';
 import { datum, geld } from '../format.js';
 
@@ -231,6 +232,8 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
                     </template>
                 </dl>
             </UiCard>
+
+            <AenderungsProtokoll subjectType="company" :subjectId="firma.id" />
 
             <UiCard>
                 <p class="t-caption">Verlauf des gesamten Kunden</p>

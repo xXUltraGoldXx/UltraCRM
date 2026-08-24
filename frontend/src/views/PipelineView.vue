@@ -8,6 +8,7 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSegmented from '../components/ui/UiSegmented.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
+import AenderungsProtokoll from '../components/AenderungsProtokoll.vue';
 import { geld } from '../format.js';
 
 // Phase eines Vorgangs als IRI fuer POST/PATCH — die API erwartet
@@ -29,6 +30,12 @@ const speichert = ref(false);
 const formFehler = ref('');
 const entwurf = ref({ title: '', value: '', stage: '' });
 const ziehtId = ref(null);
+// Vorgang-Details im Blatt: Kontakt und Firma haengen am Vorgang nur als
+// IRI (anders als "stage"), muessen fuer die Anzeige also extra geladen
+// werden.
+const gewaehlterVorgang = ref(null);
+const vorgangFirma = ref(null);
+const vorgangKontakt = ref(null);
 // Auf schmalen Bildschirmen wird eine Phase zur Zeit gezeigt; mehrere Spalten
 // nebeneinander sind auf dem Handy nicht bedienbar.
 const mobilPhase = ref(null);
@@ -202,6 +209,37 @@ async function schreibe(deal, patch, phase) {
         fehler.value = 'Verschieben hat nicht geklappt.';
     }
 }
+
+/* --- Vorgang-Details im Blatt ----------------------------------------
+   Ein Klick auf eine Karte oeffnet das Blatt; ein Ziehen (draggable/
+   dragstart) verschiebt sie weiterhin — beides steht nebeneinander auf
+   demselben Element, ohne sich in die Quere zu kommen: der Browser feuert
+   nach einem tatsaechlichen Drag kein click-Event, click und dragstart
+   schliessen sich also gegenseitig aus. Nur das Auswahlfeld fuer den
+   Phasenwechsel auf dem Handy stoppt seinen Klick separat, damit es sich
+   oeffnen laesst, ohne gleich das Blatt mit aufzureissen. */
+function idAusIri(wert) {
+    if (!wert) return null;
+    return typeof wert === 'string' ? wert.split('/').pop() : wert.id;
+}
+
+async function vorgangOeffnen(deal) {
+    gewaehlterVorgang.value = deal;
+    vorgangFirma.value = null;
+    vorgangKontakt.value = null;
+    // Einzeln fangen statt Promise.all: fehlt nur eines der beiden Rechte,
+    // soll das andere trotzdem angezeigt werden.
+    const [f, k] = await Promise.all([
+        deal.company ? api.get(`/companies/${idAusIri(deal.company)}`).catch(() => null) : null,
+        deal.contact ? api.get(`/contacts/${idAusIri(deal.contact)}`).catch(() => null) : null,
+    ]);
+    vorgangFirma.value = f?.data ?? null;
+    vorgangKontakt.value = k?.data ?? null;
+}
+
+function vorgangSchliessen() {
+    gewaehlterVorgang.value = null;
+}
 </script>
 
 <template>
@@ -266,7 +304,7 @@ async function schreibe(deal, patch, phase) {
                 </header>
 
                 <article v-for="d in nachPhase[p.id]" :key="d.id" class="deal"
-                         draggable="true" @dragstart="ziehtId = d.id">
+                         draggable="true" @dragstart="ziehtId = d.id" @click="vorgangOeffnen(d)">
                     <p class="deal__titel">{{ d.title }}</p>
                     <p class="t-footnote">{{ d.value ? geld.format(Number(d.value)) : 'ohne Wert' }}</p>
                     <p v-if="d.company" class="t-footnote muted">{{ d.company.name }}</p>
@@ -283,6 +321,7 @@ async function schreibe(deal, patch, phase) {
                     <!-- Ziehen geht auf dem Handy nicht zuverlaessig: dort
                          wechselt die Phase ueber eine Auswahl direkt auf der Karte. -->
                     <select v-if="istSchmal" :key="`${d.id}-${mobilAuswahlTick}`" class="phasewechsel" :value="d.stage?.id"
+                            @click.stop
                             @change="verschiebe(d, phasen.find((p2) => String(p2.id) === $event.target.value))">
                         <option v-for="p2 in phasen" :key="p2.id" :value="p2.id">→ {{ p2.name }}</option>
                     </select>
@@ -297,6 +336,28 @@ async function schreibe(deal, patch, phase) {
                  bestaetigen="Als verloren markieren" ton="danger" :laeuft="verlustLaeuft"
                  @schliessen="verlustAbbrechen" @bestaetigen="verlustBestaetigen">
             <UiField v-model="verlustGrund" label="Grund" placeholder="z. B. Preis, Zeitpunkt, Mitbewerber" />
+        </UiSheet>
+
+        <UiSheet :offen="!!gewaehlterVorgang" :titel="gewaehlterVorgang?.title" ohneAktionen
+                 @schliessen="vorgangSchliessen">
+            <template v-if="gewaehlterVorgang">
+                <dl class="vorgang-details">
+                    <dt class="t-footnote">Wert</dt>
+                    <dd>{{ gewaehlterVorgang.value ? geld.format(Number(gewaehlterVorgang.value)) : 'ohne Wert' }}</dd>
+                    <dt class="t-footnote">Phase</dt>
+                    <dd>{{ gewaehlterVorgang.stageName }}</dd>
+                    <template v-if="vorgangFirma">
+                        <dt class="t-footnote">Firma</dt>
+                        <dd>{{ vorgangFirma.name }}</dd>
+                    </template>
+                    <template v-if="vorgangKontakt">
+                        <dt class="t-footnote">Kontakt</dt>
+                        <dd>{{ vorgangKontakt.displayName }}</dd>
+                    </template>
+                </dl>
+
+                <AenderungsProtokoll subjectType="deal" :subjectId="gewaehlterVorgang.id" />
+            </template>
         </UiSheet>
     </div>
 </template>
@@ -383,6 +444,10 @@ select {
 .zusatz { color: var(--label-tertiary); margin-top: 2px; }
 
 .leer { text-align: center; color: var(--label-tertiary); padding: var(--sp-4) 0; }
+
+.vorgang-details { margin: 0; display: grid; gap: var(--sp-1); }
+.vorgang-details dt { color: var(--label-tertiary); }
+.vorgang-details dd { margin: 0 0 var(--sp-2); font-size: var(--text-subhead); }
 
 @media (max-width: 1100px) { .board { grid-template-columns: repeat(auto-fill, 200px); } }
 </style>

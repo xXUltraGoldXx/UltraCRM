@@ -8,23 +8,14 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
+import AenderungsProtokoll from '../components/AenderungsProtokoll.vue';
 import { ART, STATUS, QUELLE } from '../labels.js';
 import { datum, geld } from '../format.js';
-
-// Technische Feldnamen sind fuer Anwender nichtssagend.
-const FELDNAMEN = {
-    firstName: 'Vorname', lastName: 'Nachname', email: 'E-Mail', phone: 'Telefon',
-    position: 'Position', department: 'Abteilung', status: 'Status', source: 'Herkunft',
-    company: 'Firma', notes: 'Notizen', primaryContact: 'Hauptkontakt',
-    consentGivenAt: 'Einwilligung erteilt', consentWithdrawnAt: 'Einwilligung widerrufen',
-    deleteAfter: 'Löschvormerkung', title: 'Titel', value: 'Wert', stage: 'Phase',
-};
 
 const route = useRoute();
 const router = useRouter();
 const kontakt = ref(null);
 const zusatzfelder = ref([]);
-const aenderungen = ref([]);
 const aktivitaeten = ref([]);
 const vorgaenge = ref([]);
 const fehler = ref('');
@@ -36,17 +27,14 @@ async function laden() {
     const id = route.params.id;
     try {
         const iri = `/api/contacts/${id}`;
-        const [k, a, d, z, c] = await Promise.all([
+        const [k, a, d, z] = await Promise.all([
             api.get(`/contacts/${id}`),
             api.get('/activities', { params: { contact: iri } }),
             api.get('/deals', { params: { contact: iri } }),
             api.get('/custom_field_definitions', { params: { entityType: 'contact' } }),
-            api.get('/change_logs', { params: { subjectType: 'contact', subjectId: id } })
-                .catch(() => ({ data: {} })),   // ohne privacy.view nicht erlaubt — dann eben ohne
         ]);
         zusatzfelder.value = (z.data['hydra:member'] ?? z.data.member ?? [])
             .filter((f) => f.entityType === 'contact');
-        aenderungen.value = c.data['hydra:member'] ?? c.data.member ?? [];
         kontakt.value = k.data;
         aktivitaeten.value = a.data['hydra:member'] ?? a.data.member ?? [];
         vorgaenge.value = d.data['hydra:member'] ?? d.data.member ?? [];
@@ -275,16 +263,7 @@ const offeneVorgaenge = computed(() => vorgaenge.value.filter((d) => d.open));
                         </dl>
                     </UiCard>
 
-                    <UiCard v-if="aenderungen.length">
-                        <p class="t-caption">Änderungen</p>
-                        <div class="stack tight">
-                            <p v-for="c in aenderungen.slice(0, 8)" :key="c.id" class="t-footnote aenderung">
-                                <span class="feldname">{{ FELDNAMEN[c.field] || c.field }}</span>
-                                <span class="muted">{{ c.oldValue || '—' }} → {{ c.newValue || '—' }}</span>
-                                <span class="muted">{{ c.changedBy }}, {{ datum.format(new Date(c.changedAt)) }}</span>
-                            </p>
-                        </div>
-                    </UiCard>
+                    <AenderungsProtokoll subjectType="contact" :subjectId="kontakt.id" />
 
                     <UiCard>
                         <p class="t-caption">Datenschutz</p>
@@ -411,9 +390,6 @@ dt { color: var(--label-tertiary); }
 dd { margin: 0 0 var(--sp-2); font-size: var(--text-subhead); }
 .wortlaut { font-size: var(--text-footnote); color: var(--label-secondary); }
 .widerrufen { color: var(--warning); }
-.aenderung { display: grid; gap: 1px; padding-bottom: var(--sp-2); border-bottom: 1px solid var(--separator); }
-.aenderung:last-child { border-bottom: 0; padding-bottom: 0; }
-.feldname { color: var(--label-primary); font-weight: 600; }
 
 @media (max-width: 900px) {
     .spalten { grid-template-columns: 1fr; }
