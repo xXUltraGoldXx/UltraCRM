@@ -17,12 +17,12 @@ onMounted(async () => {
     }
 });
 
-// Balkenbreite relativ zur groessten Phase — ohne Diagramm-Bibliothek.
+// Bar width relative to the largest stage — no charting library used.
 const maxFunnel = computed(() => Math.max(1, ...(bericht.value?.funnel ?? []).map((f) => f.anzahl)));
 const maxQuelle = computed(() => Math.max(1, ...(bericht.value?.quellen ?? []).map((q) => q.anzahl)));
 
-// Der Pipeline-Hinweis wird nur eingeblendet, wenn ueberhaupt mehrere
-// Pipelines im Funnel vorkommen — bei nur einer Pipeline waere er ueberfluessig.
+// The pipeline label is only shown when the funnel actually contains
+// multiple pipelines — with just one pipeline it would be redundant.
 const mehrerePipelines = computed(() => new Set((bericht.value?.funnel ?? []).map((f) => f.pipeline)).size > 1);
 </script>
 

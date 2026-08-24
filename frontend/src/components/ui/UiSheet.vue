@@ -3,10 +3,10 @@ import { onBeforeUnmount, onMounted, watch } from 'vue';
 import UiButton from './UiButton.vue';
 
 /**
- * Ein Blatt, das auf dem Handy von unten hereinfaehrt und am Desktop
- * mittig steht — das native Muster fuer beides. Ersetzt window.prompt
- * und window.confirm: eigene Beschriftungen, Tastaturbedienung, und auf
- * dem Handy ueberhaupt erst zumutbar.
+ * A sheet that slides up from the bottom on mobile and sits centered on
+ * desktop — the native pattern for both. Replaces window.prompt and
+ * window.confirm: custom labels, keyboard handling, and actually usable
+ * on mobile.
  */
 const props = defineProps({
     offen: Boolean,
@@ -16,10 +16,10 @@ const props = defineProps({
     ton: { type: String, default: 'primary' }, // primary | danger
     laeuft: Boolean,
     /**
-     * Ohne Bestaetigen/Abbrechen — fuer Blaetter, die nur Inhalt zeigen
-     * (z.B. ein Menue). Vorher gab es dafuer einen zweiten Nachbau in
-     * AppShell.vue mit derselben Huelle, demselben Griff und denselben
-     * Uebergangszeiten (Review-Befund, Schwere 35).
+     * Without confirm/cancel actions — for sheets that only show content
+     * (e.g. a menu). This used to be duplicated as a second implementation
+     * in AppShell.vue, with the same shell, the same grip handle and the
+     * same transition timings.
      */
     ohneAktionen: Boolean,
 });
@@ -33,7 +33,7 @@ onBeforeUnmount(() => {
     document.removeEventListener('keydown', beiTaste);
     document.body.style.overflow = '';
 });
-// Hintergrund nicht mitscrollen lassen, solange das Blatt offen ist.
+// Keep the background from scrolling while the sheet is open.
 watch(() => props.offen, (o) => { document.body.style.overflow = o ? 'hidden' : ''; });
 </script>
 
@@ -89,7 +89,7 @@ watch(() => props.offen, (o) => { document.body.style.overflow = o ? 'hidden' : 
 .blatt-enter-active .blatt, .blatt-leave-active .blatt { transition: transform .24s cubic-bezier(.32,.72,0,1); }
 .blatt-enter-from, .blatt-leave-to { opacity: 0; }
 
-/* Handy: von unten hereinfahren, volle Breite, Daumen erreicht die Knoepfe. */
+/* Mobile: slide in from the bottom, full width, thumb reaches the buttons. */
 @media (max-width: 700px) {
     .huelle { align-items: flex-end; padding: 0; }
     .blatt {

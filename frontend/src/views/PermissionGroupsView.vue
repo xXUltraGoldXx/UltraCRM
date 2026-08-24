@@ -38,7 +38,7 @@ async function laden() {
 }
 onMounted(laden);
 
-/* ----------------------------------------------------------- Anzeige-Hilfen */
+/* ----------------------------------------------------------- Display helpers */
 
 function bereichName(schluessel) {
     return bereiche.value.find((b) => b.schluessel === schluessel)?.name ?? schluessel;
@@ -50,11 +50,11 @@ function stufenTextVon(stufenWerte) {
         .join(', ');
 }
 
-/* ------------------------------------------------------------------ Anlegen/Bearbeiten */
+/* ------------------------------------------------------------------ Create/Edit */
 
-// Leeres Rechte-Geruest je Bereich — nur die Stufen, die der Bereich laut API
-// tatsaechlich kennt. Ein Schalter fuer eine Stufe, die es fuer den Bereich
-// gar nicht gibt, waere ohne Wirkung und damit eine Luege in der Oberflaeche.
+// Empty permission scaffold per area — only the levels the area actually
+// has according to the API. A toggle for a level that doesn't exist for
+// that area would have no effect, which would make the UI misleading.
 function leeresRechteGeruest() {
     const geruest = {};
     for (const b of bereiche.value) {
@@ -64,8 +64,8 @@ function leeresRechteGeruest() {
     return geruest;
 }
 
-// Vorhandene Gruppenrechte auf das Geruest legen — unbekannte Bereiche/Stufen
-// (z. B. aus einer aelteren API-Version) werden dabei stillschweigend verworfen.
+// Apply the group's existing permissions onto the scaffold — unknown areas/
+// levels (e.g. from an older API version) are silently discarded here.
 function entwurfRechteAus(gruppenRechte) {
     const geruest = leeresRechteGeruest();
     for (const [bereich, stufen] of Object.entries(gruppenRechte || {})) {
@@ -77,8 +77,8 @@ function entwurfRechteAus(gruppenRechte) {
     return geruest;
 }
 
-// Nur gesetzte Stufen werden verschickt — die API verwirft "false" ohnehin,
-// aber so bleibt die Nutzlast schon hier lesbar und minimal.
+// Only set levels are sent — the API discards "false" anyway, but this
+// keeps the payload readable and minimal right from here.
 function baueRechte(entwurf) {
     const ergebnis = {};
     for (const b of bereiche.value) {
@@ -102,11 +102,11 @@ function bearbeiten(gruppe) {
     gruppeBlatt.bearbeiten(gruppe.id, { name: gruppe.name, rechte: entwurfRechteAus(gruppe.rechte) });
 }
 
-// Schreiben ohne Lesen ergibt keinen Sinn — das Backend behandelt "schreiben"
-// bereits so, als waere "lesen" mitgesetzt. Hier nur sichtbar gemacht: Lesen
-// wird beim Setzen von Schreiben mit angehakt, und beim Entfernen von Lesen
-// faellt Schreiben automatisch mit weg. Keine weitere Regel erfunden (z. B.
-// fuer "loeschen") — die kennt das Backend nicht.
+// Write without read makes no sense — the backend already treats "write"
+// as implying "read". This just makes that visible: read gets checked
+// automatically when write is enabled, and unchecking read automatically
+// drops write too. No further rule invented here (e.g. for "delete") —
+// the backend doesn't know one.
 function stufeUmschalten(bereichSchluessel, stufe, aktiv) {
     const stufen = gruppeBlatt.entwurf.rechte[bereichSchluessel];
     stufen[stufe] = aktiv;

@@ -1,6 +1,6 @@
 <script setup>
-// Segmented Control nach iOS-Vorbild: gleichbreite Segmente,
-// gleitender Indikator, Auswahl per Klick oder Pfeiltasten.
+// Segmented control modeled on iOS: equal-width segments,
+// sliding indicator, selection by click or arrow keys.
 defineProps({
     options: { type: Array, required: true }, // [{ value, label }]
     modelValue: { required: true },

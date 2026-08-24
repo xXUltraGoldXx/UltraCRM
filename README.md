@@ -1,107 +1,163 @@
 # UltraCRM
 
-Ein mandantenfähiges CRM für Vertrieb und Leadgenerierung — deutschsprachig,
-DSGVO-orientiert, auf eigenem Server betrieben.
+A multi-tenant CRM for sales teams and lead generation — German-language UI,
+GDPR-oriented, self-hosted.
 
-Läuft unter <https://crm.ultragold.de>.
+**Backend:** Symfony 8 · API Platform 4 · MySQL · JWT
+**Frontend:** Vue 3 · Vite · Pinia
+**Tests:** 145 (47 unit, 98 integration against a real database)
 
-## Was es kann
+![Pipeline](docs/screenshots/pipeline.png)
 
-Kontakte und Firmen mit Ansprechpartnern und Abteilungen, eine Vertriebs-
-pipeline mit frei konfigurierbaren Phasen, Aktivitäten und Wiedervorlagen,
-öffentliche Lead-Formulare mit Double-Opt-in, Auswertung, Import und Export
-(CSV/XLSX), Dublettenerkennung, Änderungs- und Löschprotokoll, Auskunft und
-Löschung nach DSGVO, frei definierbare Zusatzfelder und ein Rechtesystem je
-Mitarbeiter.
+---
 
-## Aufbau
+## What it does
 
-```
-api/        Symfony 8 + API Platform 4, JWT-Anmeldung, MySQL
-frontend/   Vue 3 + Vite + Pinia, Oberfläche nach Apple HIG
-```
-
-Ausgeliefert wird von OpenResty (1Panel-Container `1Panel-openresty-dU2w`),
-Konfiguration unter
-`/opt/1panel/apps/openresty/openresty/conf/conf.d/crm.ultragold.de.conf`:
-`frontend/dist` als Wurzel, `/api` an PHP-FPM (127.0.0.1:9000).
-
-## Die drei Regeln, die nicht gebrochen werden dürfen
-
-Sie stehen hier, weil in dieser Reihenfolge Fehler passiert sind — jeder
-davon ist in `Analyse.md` mit Belegstelle dokumentiert.
-
-**1. Mandantentrennung wird geprüft, nicht angenommen.**
-Der Doctrine-Filter `tenant_filter` hängt an allen Entities mit
-`TenantOwnedInterface` und steht im Zweifel auf „zu" (Mandant 0). Aber: Für
-`ROLE_SUPERADMIN` ist er abgeschaltet, und `User` ist absichtlich
-ausgenommen, weil er sonst die Anmeldung aussperren würde. Wo eine Regel
-eine Ausnahme hat, muss an ihrer Stelle etwas anderes stehen —
-`MandantReferenz` für Verweise zwischen Datensätzen, `UserTenantExtension`
-für Benutzerabfragen.
-
-**2. Jede API-Ressource braucht eine ausdrückliche Sicherheitsangabe.**
-Eine fehlende `security:`-Angabe sieht aus wie „nichts Besonderes nötig" und
-ist eine offene Tür. Rechte richten sich nach der *Wirkung*, nicht nach dem
-Ort im Code: Was löscht, verlangt `ROLE_ADMIN` — egal wie der Endpunkt
-heißt. In eigenen Controllern wirkt `#[IsGranted]` **nicht**; dort gehört
-`denyAccessUnlessGranted()` in den Methodenrumpf.
-
-**3. Schutzmechanismen fallen in die sichere Richtung.**
-Ein Kontakt ohne bestätigte Einwilligung ist nicht bewerbbar. Ein Widerruf
-gewinnt immer. Eine unbekannte Phasenart gilt als *offen*, nicht als
-abgeschlossen. Zusammengehörige Felder eines Schutzmechanismus werden nie
-einzeln kopiert.
-
-## Entwickeln
-
-```bash
-# Tests (108, davon 61 Integrationstests gegen eine echte Datenbank)
-cd api && vendor/bin/phpunit
-
-# Testdatenbank einmalig einrichten
-mysql -uroot -e "CREATE DATABASE crm_test CHARACTER SET utf8mb4"
-# api/.env.test.local anlegen (DATABASE_URL mit Datenbanknamen "crm",
-# Doctrine hängt "_test" an; dazu JWT_PASSPHRASE aus .env.local)
-APP_ENV=test php bin/console doctrine:schema:create
-```
-
-Die Integrationstests schicken echte Anfragen durch den Kernel — Routing,
-Rechte, Serializer und Mandantenfilter laufen wie im Betrieb. Sie leeren
-zwischen den Fällen alle Tabellen und brechen ab, wenn der Datenbankname
-nicht auf `_test` endet.
-
-**Jede Korrektur bekommt eine Gegenprobe:** Fehler wieder einbauen, Suite
-muss rot werden. Ein Test, der den fraglichen Code nicht ausführt, ist kein
-Nachweis.
-
-## Ausliefern
-
-```bash
-# Frontend
-cd frontend && npm run build && chown -R www-data:www-data dist/
-
-# Backend — der Reload ist Pflicht, cache:clear allein genügt nicht (OPcache)
-cd api && php bin/console cache:clear --env=prod && systemctl reload php8.5-fpm
-```
-
-Die Ausgabe von `cache:clear` nie unterdrücken: Ein Fatal Error darin bleibt
-sonst unbemerkt, und die Anwendung läuft mit dem alten Cache weiter.
-
-## Betrieb
-
-```bash
-# Migration der Phasen auf einem weiteren Server nachziehen
-php bin/console app:phasen:nachziehen --probe   # zeigt nur an
-php bin/console app:phasen:nachziehen
-```
-
-Datenbanksicherung läuft serverweit nachts um 03:15 (`/usr/local/bin/db-backup.sh`).
-
-## Arbeitsdokumente
-
-| Datei | Inhalt |
+| | |
 |---|---|
-| `Context.md` | Stand, Architektur, nächste Schritte — Einstieg für die Fortsetzung |
-| `TODO.md` | Arbeitspakete, offene Entscheidungen, Fragen an Alexander |
-| `Analyse.md` | Jeder gefundene Fehler mit Belegstelle, Nachweis und Lehre |
+| **Contacts & companies** | People with position and department, linked to companies, one designated primary contact per company |
+| **Sales pipeline** | Freely configurable pipelines and stages per tenant, drag-and-drop board, forecast |
+| **Activities** | Calls, notes, tasks with due dates and a follow-up list |
+| **Lead capture** | Public form endpoint with double opt-in, honeypot and rate limiting |
+| **GDPR** | Consent tracking with wording and timestamp, right-of-access export, erasure with audit trail, deletion schedule |
+| **Duplicates** | Detection by email or by name within the same company, merge that never overwrites maintained data |
+| **Import / export** | CSV and XLSX, column auto-detection, match against existing records before importing |
+| **Custom fields** | Per-tenant field definitions for contacts, companies and deals, validated server-side |
+| **Permissions** | Freely named permission groups with read/write/delete per area |
+| **Audit trail** | Who changed which field, and when — excluding secrets |
+| **Mail** | Per-tenant SMTP or Mailjet configuration with a test button |
+
+## Screenshots
+
+| Overview | Contacts |
+|---|---|
+| ![Overview](docs/screenshots/uebersicht.png) | ![Contacts](docs/screenshots/kontakte.png) |
+
+| Reporting | Permission groups |
+|---|---|
+| ![Reporting](docs/screenshots/auswertung.png) | ![Permission groups](docs/screenshots/berechtigungsgruppen.png) |
+
+| Import with duplicate matching | Contact record |
+|---|---|
+| ![Import](docs/screenshots/import.png) | ![Contact record](docs/screenshots/kontaktakte.png) |
+
+The UI is built for phones as well:
+
+<p>
+  <img src="docs/screenshots/mobil-pipeline.png" alt="Pipeline on mobile" width="260">
+  <img src="docs/screenshots/mobil-kontakte.png" alt="Contacts on mobile" width="260">
+</p>
+
+## API examples
+
+Everything the UI does is available over the REST API.
+
+```bash
+# Log in
+TOKEN=$(curl -s -X POST https://your-crm/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"you","password":"secret"}' | jq -r .token)
+
+# Create a contact
+curl -X POST https://your-crm/api/contacts \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/ld+json' \
+  -d '{"firstName":"Marion","lastName":"Hansen","email":"m.hansen@example.com","source":"messe"}'
+
+# Move a deal to another stage
+curl -X PATCH https://your-crm/api/deals/12 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/merge-patch+json' \
+  -d '{"stage":"/api/stages/5"}'
+
+# Public lead form — no authentication, the token identifies the tenant
+curl -X POST https://your-crm/api/public/leads \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"<form token>","lastName":"Lead","email":"lead@example.com","consent":true}'
+```
+
+Interactive documentation lives at `/api/docs`.
+
+## Three rules the code keeps
+
+Each of these is here because it was learned the hard way.
+
+**1. Tenant isolation is verified, never assumed.**
+A Doctrine filter constrains every tenant-owned entity and defaults to closed.
+But it is switched off for superadmins, and `User` is deliberately exempt —
+otherwise it would lock out the login itself. Wherever a rule has an
+exception, something else has to take its place: an explicit check for
+references between records, a query extension for user lookups.
+
+**2. Every API resource declares its security.**
+A missing `security:` attribute looks like "nothing special needed" and is an
+open door. Rights follow the *effect*, not the name: anything that deletes
+requires the delete permission for its area, no matter what the endpoint is
+called. In hand-written controllers `#[IsGranted]` is not evaluated —
+`denyAccessUnlessGranted()` belongs in the method body.
+
+**3. Safety mechanisms fail in the safe direction.**
+A contact without confirmed consent is not contactable. A withdrawal always
+wins. An unknown stage type counts as *open*, not as closed. Fields that
+together form one safety mechanism are never copied individually.
+
+## Getting started
+
+```bash
+# Backend
+cd api
+composer install
+cp .env .env.local          # set DATABASE_URL, APP_SECRET, JWT_PASSPHRASE
+php bin/console lexik:jwt:generate-keypair
+php bin/console doctrine:schema:create
+
+# Frontend
+cd ../frontend
+npm install
+npm run build               # or: npm run dev
+```
+
+Serve `frontend/dist` as the document root and route `/api` to
+`api/public/index.php`.
+
+### Tests
+
+```bash
+cd api
+mysql -e "CREATE DATABASE crm_test CHARACTER SET utf8mb4"
+# .env.test.local: DATABASE_URL with database name "crm" (Doctrine appends "_test"),
+# plus JWT_PASSPHRASE
+APP_ENV=test php bin/console doctrine:schema:create
+vendor/bin/phpunit
+```
+
+The integration tests send real requests through the kernel — routing,
+security, serializer and the tenant filter all behave exactly as in
+production. They truncate every table between cases and refuse to run unless
+the database name ends in `_test`.
+
+### Maintenance commands
+
+```bash
+php bin/console app:phasen:nachziehen     # backfill pipelines/stages after an upgrade
+php bin/console app:gruppen:vorlagen      # create the default permission groups
+```
+
+## Deployment notes
+
+Clearing the cache is not enough — PHP-FPM has to be reloaded, otherwise
+OPcache keeps serving the old classes:
+
+```bash
+php bin/console cache:clear --env=prod && systemctl reload php8.5-fpm
+```
+
+Never suppress the output of `cache:clear`. A fatal error in there stays
+invisible and the application silently keeps running on the old cache.
+
+## License
+
+GNU Affero General Public License v3.0 — see [LICENSE](LICENSE).
+
+Anyone who runs a modified version of this software as a network service has
+to make its source available to the users of that service.

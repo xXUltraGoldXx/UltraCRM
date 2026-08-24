@@ -11,7 +11,7 @@ import UiSheet from '../components/ui/UiSheet.vue';
 import AenderungsProtokoll from '../components/AenderungsProtokoll.vue';
 import { geld } from '../format.js';
 
-// Phase eines Vorgangs als IRI fuer POST/PATCH — die API erwartet
+// A deal's stage as an IRI for POST/PATCH — the API expects
 // {"stage": "/api/stages/<id>"}.
 function iri(phase) {
     return `/api/stages/${phase.id}`;
@@ -30,14 +30,14 @@ const speichert = ref(false);
 const formFehler = ref('');
 const entwurf = ref({ title: '', value: '', stage: '' });
 const ziehtId = ref(null);
-// Vorgang-Details im Blatt: Kontakt und Firma haengen am Vorgang nur als
-// IRI (anders als "stage"), muessen fuer die Anzeige also extra geladen
-// werden.
+// Deal details in the sheet: contact and company only hang off the deal
+// as an IRI (unlike "stage"), so they need to be loaded separately for
+// display.
 const gewaehlterVorgang = ref(null);
 const vorgangFirma = ref(null);
 const vorgangKontakt = ref(null);
-// Auf schmalen Bildschirmen wird eine Phase zur Zeit gezeigt; mehrere Spalten
-// nebeneinander sind auf dem Handy nicht bedienbar.
+// On narrow screens only one stage is shown at a time; several columns
+// side by side aren't usable on mobile.
 const mobilPhase = ref(null);
 const istSchmal = ref(window.matchMedia('(max-width: 820px)').matches);
 window.matchMedia('(max-width: 820px)').addEventListener('change', (e) => { istSchmal.value = e.matches; });
@@ -56,8 +56,8 @@ async function laden() {
         deals.value = d.data['hydra:member'] ?? d.data.member ?? [];
         zusatzfelder.value = (z.data['hydra:member'] ?? z.data.member ?? [])
             .filter((x) => x.entityType === 'deal');
-        // Auswahl beibehalten, wenn die Pipeline noch existiert — sonst die
-        // mit der niedrigsten position vorauswaehlen.
+        // Keep the current selection if that pipeline still exists — otherwise
+        // preselect the one with the lowest position.
         if (!pipelines.value.some((pl) => pl.id === pipelineId.value)) {
             pipelineId.value = pipelines.value[0]?.id ?? null;
         }
@@ -81,14 +81,14 @@ async function ladePhasen() {
 }
 watch(pipelineId, ladePhasen);
 
-// Anlage-Formular: nur offene Phasen anbieten. Verloren-Phasen verlangen
-// serverseitig einen Verlustgrund, fuer den es im Anlage-Formular kein Feld
-// gibt — waehlbar waeren sie eine Sackgasse ohne erkennbaren Grund.
+// Creation form: only offer open stages. Lost stages require a loss reason
+// on the server, and the creation form has no field for that — offering
+// them here would be a dead end with no visible cause.
 const offenePhasen = computed(() => phasen.value.filter((p) => p.art === 'offen'));
 
-// Vorbelegung fuer neue Vorgaenge (erste offene Phase) und die Handy-
-// Spaltenauswahl (erste Phase ueberhaupt, nach position) der gerade
-// gewaehlten Pipeline setzen.
+// Set the default for new deals (first open stage) and the mobile column
+// selection (first stage overall, by position) for the currently
+// selected pipeline.
 watch(phasen, (neu) => {
     if (!neu.length) return;
     const ersteOffene = offenePhasen.value[0];
@@ -98,10 +98,10 @@ watch(phasen, (neu) => {
     }
 });
 
-/* Export: Download über Blob, damit der Authorization-Header mitgeht — ein
-   einfacher Link würde ohne Anmeldung landen (siehe PrivacyView.vue,
-   auskunft()). Die Pipeline lädt serverseitig ohnehin alle Vorgänge, daher
-   ohne zusätzliche Filterparameter. */
+/* Export: downloads via a Blob so the Authorization header is sent — a
+   plain link would land on the login page (same pattern as PrivacyView.vue,
+   auskunft()). The server loads all deals for the pipeline anyway, so no
+   extra filter parameters are needed. */
 const exportOffen = ref(false);
 const exportLaeuft = ref(false);
 
@@ -153,15 +153,15 @@ async function speichern() {
     }
 }
 
-/* Verschieben per Ziehen. Bei "verloren" ist eine Begruendung Pflicht —
-   die API lehnt sonst ab, deshalb wird sie vorher erfragt. */
+/* Moving by drag. For "lost", a reason is required — the API rejects the
+   request otherwise, so it's asked for up front. */
 const verlustBlatt = ref(null); // { deal, phase }
 const verlustGrund = ref('');
 const verlustLaeuft = ref(false);
-// Zaehler, der bei jedem Schliessen des Blatts hochgezaehlt wird. Er fliesst
-// in den :key des Handy-Auswahlfelds ein und erzwingt so dessen Neuaufbau —
-// sonst bliebe das <select> nach einem Abbruch optisch auf der eben
-// gewaehlten Verloren-Phase stehen, obwohl d.stage.id sich nie geaendert hat.
+// Counter that's incremented every time the sheet is closed. It feeds into
+// the :key of the mobile select field and thereby forces it to rebuild —
+// otherwise, after canceling, the <select> would visually stay on the
+// just-chosen "lost" stage even though d.stage.id never actually changed.
 const mobilAuswahlTick = ref(0);
 
 function verlustAbbrechen() {
@@ -178,9 +178,9 @@ async function ablegen(phase) {
 async function verschiebe(deal, phase) {
     if (!deal || !phase || deal.stage?.id === phase.id) return;
 
-    // Verloren braucht eine Begruendung — dafuer ein richtiges Blatt statt
-    // eines Browser-Dialogs. Nicht der Name, sondern die "art" der Phase
-    // entscheidet, ob es sich um den Verloren-Abschluss handelt.
+    // "Lost" needs a reason — a proper sheet is used for that instead of a
+    // browser dialog. It's not the stage's name but its "art" that decides
+    // whether this is a lost-deal closure.
     if (phase.art === 'verloren') {
         verlustGrund.value = '';
         verlustBlatt.value = { deal, phase };
@@ -200,24 +200,23 @@ async function verlustBestaetigen() {
 
 async function schreibe(deal, patch, phase) {
     const vorher = deal.stage;
-    deal.stage = phase; // sofortige Rueckmeldung
+    deal.stage = phase; // instant feedback
     try {
         await api.patch(`/deals/${deal.id}`, patch, { headers: { 'Content-Type': 'application/merge-patch+json' } });
         await laden();
     } catch (e) {
-        deal.stage = vorher; // zurueckrollen, wenn der Server ablehnt
+        deal.stage = vorher; // roll back if the server rejects it
         fehler.value = 'Verschieben hat nicht geklappt.';
     }
 }
 
-/* --- Vorgang-Details im Blatt ----------------------------------------
-   Ein Klick auf eine Karte oeffnet das Blatt; ein Ziehen (draggable/
-   dragstart) verschiebt sie weiterhin — beides steht nebeneinander auf
-   demselben Element, ohne sich in die Quere zu kommen: der Browser feuert
-   nach einem tatsaechlichen Drag kein click-Event, click und dragstart
-   schliessen sich also gegenseitig aus. Nur das Auswahlfeld fuer den
-   Phasenwechsel auf dem Handy stoppt seinen Klick separat, damit es sich
-   oeffnen laesst, ohne gleich das Blatt mit aufzureissen. */
+/* --- Deal details in the sheet ----------------------------------------
+   A click on a card opens the sheet; dragging (draggable/dragstart) still
+   moves it — both live side by side on the same element without getting
+   in each other's way: the browser doesn't fire a click event after an
+   actual drag, so click and dragstart are mutually exclusive. Only the
+   mobile stage-change select field stops its own click event separately,
+   so it can be opened without also popping open the sheet. */
 function idAusIri(wert) {
     if (!wert) return null;
     return typeof wert === 'string' ? wert.split('/').pop() : wert.id;
@@ -227,8 +226,8 @@ async function vorgangOeffnen(deal) {
     gewaehlterVorgang.value = deal;
     vorgangFirma.value = null;
     vorgangKontakt.value = null;
-    // Einzeln fangen statt Promise.all: fehlt nur eines der beiden Rechte,
-    // soll das andere trotzdem angezeigt werden.
+    // Caught individually instead of Promise.all: if only one of the two
+    // permissions is missing, the other should still be shown.
     const [f, k] = await Promise.all([
         deal.company ? api.get(`/companies/${idAusIri(deal.company)}`).catch(() => null) : null,
         deal.contact ? api.get(`/contacts/${idAusIri(deal.contact)}`).catch(() => null) : null,
@@ -368,7 +367,7 @@ function vorgangSchliessen() {
 .head__aktionen { flex-wrap: wrap; }
 .fehler { color: var(--danger); }
 
-/* Export: unauffälliger Knopf mit kleinem Auswahlmenü CSV/Excel. */
+/* Export: unobtrusive button with a small CSV/Excel selection menu. */
 .export { position: relative; }
 .export__menu {
     position: absolute; top: calc(100% + var(--sp-2)); right: 0; z-index: 10;
@@ -395,14 +394,14 @@ select {
     border-radius: var(--radius-m); padding: 11px 14px;
 }
 
-/* Nur sichtbar, wenn der Mandant mehr als eine Pipeline hat. */
+/* Only visible when the tenant has more than one pipeline. */
 .pipeline-wahl { max-width: 280px; }
 .pipeline-wahl select { min-height: 44px; }
 
-/* Die Klasse landet auf dem Wurzelelement der Komponente — das IST bereits
-   das Segment-Element. Ein :deep()-Nachfahrenselektor liefe hier ins Leere.
-   auto-fit statt einer festen Spaltenzahl, weil Pipelines unterschiedlich
-   viele Phasen haben koennen. */
+/* This class lands on the component's root element — which already IS the
+   segment element. A :deep() descendant selector would find nothing here.
+   auto-fit instead of a fixed column count, since pipelines can have
+   varying numbers of stages. */
 .phasenwahl {
     width: 100%;
     display: grid;

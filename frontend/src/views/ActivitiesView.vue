@@ -44,7 +44,7 @@ onMounted(laden);
 
 async function abhaken(a) {
     const vorher = a.done;
-    a.done = true; // sofortige Rueckmeldung
+    a.done = true; // instant feedback
     try {
         await api.patch(`/activities/${a.id}`, { done: true }, { headers: { 'Content-Type': 'application/merge-patch+json' } });
         await laden();

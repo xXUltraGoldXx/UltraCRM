@@ -22,8 +22,8 @@ import MailSettingsView from '../views/MailSettingsView.vue';
 import DuplicatesView from '../views/DuplicatesView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 
-// Platzhalter sind bewusst benannt: sie sagen, was dort entsteht, statt eine
-// leere Seite zu zeigen.
+// Placeholders are deliberately labeled: they say what will go there,
+// instead of showing a blank page.
 
 const routes = [
     { path: '/login', component: LoginView, meta: { oeffentlich: true } },

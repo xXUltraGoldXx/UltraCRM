@@ -20,9 +20,9 @@ function toggleTheme() {
 }
 onMounted(applyTheme);
 
-// Jeder Eintrag nennt das Recht, das ihn sichtbar macht. Fehlt es, wird er
-// ausgeblendet — sonst klickt ein Mitarbeiter auf Menuepunkte, die ihm
-// anschliessend 403 liefern. Die Uebersicht bleibt fuer alle sichtbar.
+// Each entry names the permission that makes it visible. If it's missing,
+// the entry is hidden — otherwise a staff member would click a menu item
+// that then returns 403. The overview stays visible to everyone.
 const alleNav = [
     { to: '/', icon: 'overview', label: 'Übersicht', tab: true },
     { to: '/kontakte', icon: 'contacts', label: 'Kontakte', tab: true, recht: 'contacts.view' },
@@ -39,8 +39,8 @@ const alleNav = [
 
 const nav = computed(() => alleNav.filter((n) => !n.recht || auth.darf(n.recht)));
 
-// Auf dem Handy passen vier Ziele in die Leiste; alles Weitere liegt hinter
-// "Mehr". Mehr als fuenf Tabs sind auf Daumenbreite nicht mehr treffsicher.
+// On mobile, four destinations fit in the tab bar; everything else lives
+// behind "More". More than five tabs are no longer reliably tappable at thumb width.
 const tabs = computed(() => nav.value.filter((n) => n.tab));
 const weitere = computed(() => nav.value.filter((n) => !n.tab));
 const mehrOffen = ref(false);
@@ -210,7 +210,7 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 
 .main { display: flex; flex-direction: column; min-width: 0; background: var(--bg-grouped); }
 
-/* Navigation-Bar mit dezentem Blur — der Inhalt scrollt darunter durch. */
+/* Nav bar with a subtle blur — content scrolls underneath it. */
 .crumb { color: var(--label-tertiary); font-weight: 500; }
 .navbar {
     position: sticky; top: 0; z-index: 10;
@@ -235,15 +235,15 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 
 .content { padding: var(--sp-8); max-width: 1180px; width: 100%; }
 
-/* Tab-Leiste: unten, mit Blur, ueber dem Home-Indikator freigehalten. */
+/* Tab bar: at the bottom, blurred, kept clear of the home indicator. */
 .tabbar { display: none; }
 
 @media (max-width: 900px) {
     .shell { grid-template-columns: 1fr; }
     .sidebar { display: none; }
     .navbar { padding: var(--sp-3) var(--sp-4); }
-    /* Theme und Abmelden liegen auf dem Handy im Mehr-Menue — hier waeren
-       sie doppelt und wuerden die Leiste unnoetig fuellen. */
+    /* Theme toggle and logout live in the mobile "More" menu — here they'd
+       be duplicated and would needlessly clutter the bar. */
     .navbar .iconbtn { display: none; }
     .content {
         padding: var(--sp-4) var(--sp-4) calc(76px + env(safe-area-inset-bottom));

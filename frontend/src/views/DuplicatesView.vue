@@ -30,8 +30,8 @@ async function laden() {
 onMounted(laden);
 
 function fragen(behalten, aufloesen, gruppe) {
-    // Kontakte, die nach diesem Zusammenführen in der Gruppe noch offen bleiben
-    // (behalten und aufloesen sind dann erledigt).
+    // Contacts remaining open in the group after this merge
+    // (behalten and aufloesen will then be resolved).
     const restAnzahl = gruppe.kontakte.length - 2;
     blatt.value = { behalten, aufloesen, restAnzahl };
 }

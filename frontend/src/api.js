@@ -5,7 +5,6 @@ const api = axios.create({
     headers: { Accept: 'application/ld+json' },
 });
 
-// JWT automatisch mitschicken
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('crm-token');
     if (token && !config.url.endsWith('/login')) {
@@ -14,7 +13,6 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Bei 401 zurück zum Login
 api.interceptors.response.use(
     (res) => res,
     (err) => {

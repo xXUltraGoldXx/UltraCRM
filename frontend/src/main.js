@@ -4,7 +4,7 @@ import App from './App.vue';
 import router from './router';
 import './assets/app.css';
 
-// Die Oberflaeche ist durchgehend deutsch (siehe labels.js).
+// The UI is entirely German throughout (see labels.js).
 document.documentElement.lang = 'de';
 
 const app = createApp(App);

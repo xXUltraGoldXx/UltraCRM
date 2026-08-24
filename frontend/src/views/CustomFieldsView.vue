@@ -29,8 +29,8 @@ async function laden() {
 }
 onMounted(laden);
 
-/* Schlüssel aus der Bezeichnung ableiten — er darf sich später nicht mehr
-   ändern, sonst verlieren bestehende Datensätze ihren Wert. */
+/* Derive the key from the label — it must never change afterwards, or
+   existing records would lose their value. */
 function schluesselAus(text) {
     return text.toLowerCase()
         .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')

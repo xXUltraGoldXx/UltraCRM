@@ -8,8 +8,8 @@ import UiBadge from '../components/ui/UiBadge.vue';
 import UiSegmented from '../components/ui/UiSegmented.vue';
 import { SICHERHEIT_LABEL } from '../labels.js';
 
-// Reihenfolge und Beschriftung der Zielfelder — "Ignorieren" steht oben,
-// weil es der haeufigste Vorschlag fuer unbekannte Spalten ist.
+// Order and labeling of the target fields — "Ignore" comes first, because
+// it's the most common suggestion for unknown columns.
 const FELD_OPTIONEN = [
     { value: 'ignore', label: 'Ignorieren' },
     { value: 'firstName', label: 'Vorname' },
@@ -22,7 +22,7 @@ const FELD_OPTIONEN = [
 ];
 const FELD_LABEL = Object.fromEntries(FELD_OPTIONEN.map((f) => [f.value, f.label]));
 
-// Entscheidung je Zeile in der Abgleich-Vorschau.
+// Decision per row in the matching preview.
 const ENTSCHEIDUNG_OPTIONEN = [
     { value: 'neu', label: 'Neu anlegen' },
     { value: 'aktualisieren', label: 'Ergänzen' },
@@ -36,7 +36,7 @@ const SCHRITTE = [
     { id: 'bericht', label: 'Bericht' },
 ];
 
-const MAX_DATEIGROESSE = 5 * 1024 * 1024; // 5 MB, siehe TODO.md A11
+const MAX_DATEIGROESSE = 5 * 1024 * 1024; // 5 MB
 
 const schritt = ref('auswahl');
 const datei = ref(null);
@@ -48,13 +48,13 @@ const previewRows = ref([]);
 const totalRows = ref(0);
 const mapping = ref([]);
 
-// Ergebnis von /import/preview (Abgleich gegen den Bestand) und die
-// Entscheidung des Anwenders je Zeile — Schluessel ist die Zeilennummer
-// als String, wie es /import/execute in "decisions" erwartet.
+// Result of /import/preview (matching against existing records) and the
+// user's decision per row — the key is the row number as a string, as
+// /import/execute expects it in "decisions".
 const abgleich = ref(null);
 const entscheidungen = ref({});
-// Nur gesetzt, wenn die Vorschau tatsaechlich durchlaufen wurde — sonst
-// werden beim Uebernehmen keine decisions mitgeschickt (Punkt 7).
+// Only set once the preview has actually been run — otherwise no decisions
+// are sent when applying the import.
 const vorschauGenutzt = ref(false);
 
 const bericht = ref(null);
@@ -108,12 +108,12 @@ function zurZuordnung() {
     schritt.value = 'zuordnung';
 }
 
-// Zeilen mit mindestens einem Treffer im Bestand stehen im Fokus der
-// Vorschau; Zeilen ohne Treffer werden laut Vorgabe nicht aufgeblaeht
-// (Punkt 5) und nur als Summe gezeigt.
-// Zu entscheiden sind Zeilen mit Bestandstreffer UND Zeilen, die schon
-// weiter oben in derselben Datei stehen — beide braucht der Anwender vor
-// Augen, der Rest waere nur Laenge.
+// Rows with at least one match in the existing records are the focus of
+// the preview; rows with no match are not blown up into a long list and
+// are shown only as a count.
+// Rows needing a decision are those with an existing-record match AND
+// rows that are already duplicated earlier in the same file — the user
+// needs to see both, the rest would just be noise.
 const zeilenMitTreffer = computed(
     () => abgleich.value?.rows.filter((z) => z.treffer?.length || z.dateiDublette) ?? []
 );
@@ -137,11 +137,11 @@ function kontaktWaehlen(zeile, id) {
     entscheidungen.value[zeile.row] = { action: 'aktualisieren', contactId: id };
 }
 
-// Sammelaktion: bei jeder Zeile, deren bester Treffer sicher ist (gleiche
-// E-Mail), automatisch ergaenzen statt einzeln durchklicken zu muessen.
+// Bulk action: for every row whose best match is certain (same email),
+// automatically merge instead of requiring the user to click through each one.
 function alleSicherErgaenzen() {
     for (const zeile of zeilenMitTreffer.value) {
-        if (zeile.dateiDublette) continue; // steht schon oben in der Datei
+        if (zeile.dateiDublette) continue; // already duplicated earlier in the file
         if (zeile.treffer[0]?.sicherheit === 'sicher') {
             entscheidungen.value[zeile.row] = { action: 'aktualisieren', contactId: zeile.treffer[0].id };
         }
@@ -475,7 +475,7 @@ header p { margin: var(--sp-1) 0 0; }
 .berichtliste li { font-size: var(--text-footnote); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-s); background: var(--fill-quaternary); }
 .berichtliste li.fehlerzeile { color: var(--danger); }
 
-/* Schritt 3: Abgleich gegen den Bestand */
+/* Step 3: matching against existing records */
 .abgleich-liste { display: flex; flex-direction: column; gap: var(--sp-3); }
 .abgleich-zeile { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
 .abgleich-kopf { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); }

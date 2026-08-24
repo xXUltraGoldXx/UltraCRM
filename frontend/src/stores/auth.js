@@ -11,7 +11,7 @@ export const useAuthStore = defineStore('auth', {
         isAdmin: (s) => s.user?.roles?.includes('ROLE_ADMIN') ?? false,
         isSuperadmin: (s) => s.user?.roles?.includes('ROLE_SUPERADMIN') ?? false,
     },
-    // kein Getter, da Argument nötig — als Action-artige Methode
+    // Not a getter, since it needs an argument — implemented as an action-like method instead.
 
     actions: {
         async login(username, password) {
@@ -30,12 +30,12 @@ export const useAuthStore = defineStore('auth', {
             localStorage.removeItem('crm-token');
         },
         /**
-         * Darf der angemeldete Benutzer das? Bildet die Regel der API nach:
-         * Admins duerfen alles, und wer aendern darf, darf auch ansehen.
+         * Is the logged-in user allowed to do this? Mirrors the API's rule:
+         * admins can do anything, and whoever may edit may also view.
          *
-         * Wichtig: Das hier ist nur fuer die Anzeige. Die verbindliche
-         * Pruefung steht im PermissionVoter auf dem Server — das Frontend
-         * blendet nur aus, was ohnehin 403 liefern wuerde.
+         * Important: this is for display purposes only. The binding check
+         * lives in the PermissionVoter on the server — the frontend only
+         * hides what would return 403 anyway.
          */
         darf(recht) {
             if (this.isAdmin || this.isSuperadmin) return true;
@@ -43,7 +43,7 @@ export const useAuthStore = defineStore('auth', {
             const meine = this.user?.permissions || [];
             if (meine.includes(recht)) return true;
 
-            // manage schliesst view ein — dieselbe Zuordnung wie serverseitig.
+            // manage implies view — the same mapping as on the server.
             const einschluss = {
                 'contacts.view': 'contacts.manage',
                 'deals.view': 'deals.manage',

@@ -49,8 +49,8 @@ const pipelineBlatt = useVerwaltungsBlatt('/pipelines', {
     nachSpeichern: laden,
 });
 
-// Bestaetigungsblatt vor dem Loeschen — unumkehrbarer Schritt, siehe
-// Dubletten-Zusammenfuehrung fuer dasselbe Muster.
+// Confirmation sheet before deleting — an irreversible step; the same
+// pattern is used for merging duplicates.
 const pipelineLoeschen = useLoeschenBestaetigung('/pipelines', {
     holeId: (p) => p.id,
     nachLoeschen: laden,
@@ -78,8 +78,8 @@ const phaseLoeschen = useLoeschenBestaetigung('/stages', {
     nachLoeschen: laden,
 });
 
-// Reihenfolge: Position mit dem Nachbarn tauschen. Kein Drag&Drop — auf dem
-// Handy ist hoch/runter zuverlaessiger zu treffen.
+// Reordering: swap position with the neighbor. No drag & drop — on mobile,
+// up/down buttons are more reliable to hit.
 const verschiebtPhaseId = ref(null);
 async function phaseVerschieben(pipeline, phase, richtung) {
     const liste = pipeline.stages;
@@ -91,11 +91,11 @@ async function phaseVerschieben(pipeline, phase, richtung) {
     verschiebtPhaseId.value = phase.id;
     fehler.value = '';
     try {
-        // Nacheinander statt parallel: schlaegt der zweite PATCH fehl, nachdem
-        // der erste bereits durch ist, ist der Fehlerfall eindeutig zuzuordnen.
-        // In jedem Fall — egal ob der erste oder der zweite Aufruf scheitert —
-        // wird unten neu geladen, damit die Anzeige nie vom tatsaechlichen
-        // Serverstand abweicht (siehe Befund: zwei Phasen auf derselben Position).
+        // Sequential, not parallel: if the second PATCH fails after the first
+        // has already gone through, the failure case is unambiguous to handle.
+        // Either way — whether the first or the second call fails — the list
+        // is reloaded below, so the display never drifts from the actual
+        // server state (which would otherwise risk two stages sharing one position).
         await api.patch(`/stages/${phase.id}`, { position: nachbar.position }, {
             headers: { 'Content-Type': 'application/merge-patch+json' },
         });
@@ -104,8 +104,8 @@ async function phaseVerschieben(pipeline, phase, richtung) {
         });
         await laden();
     } catch (e) {
-        // laden() setzt fehler.value bei Erfolg selbst zurueck — deshalb erst
-        // neu laden und die Meldung danach setzen, sonst waere sie sofort wieder weg.
+        // laden() clears fehler.value itself on success — so reload first and
+        // set the message afterwards, otherwise it would be cleared immediately.
         await laden();
         fehler.value = nachricht(e, 'Die Reihenfolge konnte nicht vollständig geändert werden. Die Ansicht wurde neu geladen.');
     } finally {

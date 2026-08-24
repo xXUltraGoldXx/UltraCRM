@@ -13,7 +13,7 @@ defineProps({
 </template>
 
 <style scoped>
-/* Pill-Form und ruhige Zustandswechsel wie bei nativen Controls. */
+/* Pill shape and calm state transitions, like native controls. */
 .btn {
     display: inline-flex;
     align-items: center;

@@ -50,7 +50,7 @@ async function laden() {
 onMounted(laden);
 watch(() => route.params.id, laden);
 
-/* --- Notiz direkt hier anlegen: ein Feld, ein Klick ------------------- */
+/* --- Add a note directly here: one field, one click ------------------- */
 const notiz = ref('');
 const notizArt = ref('notiz');
 const notizLaeuft = ref(false);
@@ -73,7 +73,7 @@ async function notizSpeichern() {
     }
 }
 
-/* --- Bearbeiten im Blatt --------------------------------------------- */
+/* --- Edit in the sheet ------------------------------------------------ */
 const bearbeiten = ref(false);
 const entwurf = ref({});
 const speichert = ref(false);
@@ -108,7 +108,7 @@ async function bearbeitenSpeichern() {
     }
 }
 
-/* --- Status mit einem Klick weiterschalten --------------------------- */
+/* --- Advance status with one click ------------------------------------ */
 async function statusSetzen(neu) {
     const vorher = kontakt.value.status;
     kontakt.value.status = neu;

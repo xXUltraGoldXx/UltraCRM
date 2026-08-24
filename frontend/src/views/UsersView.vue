@@ -88,8 +88,8 @@ async function speichern() {
             permissionGroup: entwurf.value.permissionGroup,
         };
         if (entwurf.value.email) nutzlast.email = entwurf.value.email;
-        // Leeres Feld heisst "Passwort unveraendert lassen" — sonst wuerde
-        // jedes Speichern der Stammdaten das Passwort loeschen.
+        // An empty field means "leave the password unchanged" — otherwise every
+        // save of the master data would wipe out the password.
         if (entwurf.value.plainPassword) nutzlast.plainPassword = entwurf.value.plainPassword;
 
         if (bearbeiteId.value) {
@@ -211,8 +211,8 @@ select {
 .rechte { display: flex; flex-direction: column; gap: var(--sp-4); }
 .gruppe .t-caption { margin: 0 0 var(--sp-1); }
 .rechte__fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
-/* Deaktiviert durch Gruppenzuweisung — deutlich als wirkungslos markiert,
-   statt sie kommentarlos verschwinden zu lassen. */
+/* Disabled by group assignment — clearly marked as having no effect,
+   instead of silently disappearing. */
 .rechte--inaktiv { opacity: .45; }
 .rechte--inaktiv .haken { cursor: not-allowed; }
 

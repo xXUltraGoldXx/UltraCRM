@@ -52,7 +52,7 @@ async function laden() {
                 active: eintrag.active,
             };
             secretSet.value = !!eintrag.secretSet;
-            // Ohne hinterlegtes Geheimnis ist das Feld gleich zum Eintragen offen.
+            // With no secret stored yet, the field starts out open for entry.
             secretErsetzen.value = !secretSet.value;
         } else {
             id.value = null;
@@ -69,10 +69,10 @@ async function laden() {
 }
 onMounted(laden);
 
-// Mailjet laeuft ueber deren SMTP-Zugang (api/src/Entity/MailSetting.php:20:
-// "Mailjet laeuft ueber deren SMTP-Zugang (in-v3.mailjet.com:587, API-Key
-// als Benutzer, Secret als Passwort)"). Nur bei einer echten Auswahl durch
-// den Anwender vorbelegen, nicht beim Nachladen eines bestehenden Eintrags.
+// Mailjet is accessed via their SMTP gateway (in-v3.mailjet.com:587, API
+// key as the username, secret as the password — see api/src/Entity/MailSetting.php).
+// Only prefill these values on an actual selection by the user, not when
+// reloading an existing entry.
 function providerWaehlen(wert) {
     entwurf.value.provider = wert;
     if (wert === 'mailjet') {
@@ -104,8 +104,8 @@ async function speichern() {
             fromName: entwurf.value.fromName,
             active: entwurf.value.active,
         };
-        // Leeres Feld nicht mitschicken — sonst loescht der Processor das
-        // bestehende Geheimnis (api/src/State/MailSettingProcessor.php:32ff).
+        // Don't send an empty field — otherwise the processor deletes the
+        // existing secret (see api/src/State/MailSettingProcessor.php).
         if (secretErsetzen.value && plainSecret.value.trim() !== '') {
             nutzlast.plainSecret = plainSecret.value;
         }
@@ -130,7 +130,7 @@ async function speichern() {
     }
 }
 
-/* --- Testmail ---------------------------------------------------------- */
+/* --- Test email ---------------------------------------------------------- */
 const testAdresse = ref('');
 const testLaeuft = ref(false);
 const testErgebnis = ref(null); // { ok: bool, text: string }

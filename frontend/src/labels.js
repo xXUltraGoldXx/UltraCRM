@@ -1,17 +1,17 @@
-// Technische Feldnamen aus dem Änderungsprotokoll sind für Anwender
-// nichtssagend — deckt Kontakt, Firma und Vorgang ab (siehe api/src/Entity/
-// Contact.php, Company.php, Deal.php). Unbekannte Feldnamen fallen in der
-// Anzeige auf den Rohwert zurück.
+// Raw technical field names from the change log are meaningless to users —
+// this covers contact, company and deal (see api/src/Entity/Contact.php,
+// Company.php, Deal.php). Unknown field names fall back to the raw value
+// in the display.
 export const FELDNAMEN = {
-    // Kontakt
+    // Contact
     firstName: 'Vorname', lastName: 'Nachname', email: 'E-Mail', phone: 'Telefon',
     position: 'Position', department: 'Abteilung', status: 'Status', source: 'Herkunft',
     company: 'Firma', notes: 'Notizen', primaryContact: 'Hauptkontakt',
     consentGivenAt: 'Einwilligung erteilt', consentWithdrawnAt: 'Einwilligung widerrufen',
     deleteAfter: 'Löschvormerkung',
-    // Firma
+    // Company
     name: 'Name', street: 'Straße', zipCode: 'PLZ', city: 'Ort', website: 'Website',
-    // Vorgang
+    // Deal
     title: 'Titel', value: 'Wert', currency: 'Währung', stage: 'Phase',
     contact: 'Kontakt', owner: 'Verantwortlich', expectedCloseAt: 'Erwarteter Abschluss',
     lostReason: 'Verlustgrund',
@@ -66,9 +66,9 @@ export const SICHERHEIT_LABEL = {
     moeglich: 'Möglich',
 };
 
-// Art einer Pipeline-Phase (Stage.art) — entscheidet, ob ein Vorgang darin
-// als offen, gewonnen oder verloren zaehlt. Die Namen der Phasen selbst
-// kommen seit A5 aus der Datenbank und stehen nicht mehr hier.
+// Type of a pipeline stage (Stage.art) — decides whether a deal in it
+// counts as open, won or lost. The stage names themselves come from the
+// database now, not from this file.
 export const STAGE_ART = {
     offen: 'Offen',
     gewonnen: 'Gewonnen',

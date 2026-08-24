@@ -3,18 +3,18 @@ import api from '../api';
 import { nachricht } from './nachricht.js';
 
 /**
- * Gemeinsame Logik fuer ein Loeschen-Bestaetigungsblatt: merkt sich das zu
- * loeschende Objekt, loescht per DELETE und zeigt eine Fehlermeldung direkt
- * im Blatt an — insbesondere den 409-Fall, wenn noch Vorgaenge an der Phase
- * oder Pipeline haengen. Fasst den Block zusammen, der bei Pipeline und
- * Phase praktisch 1:1 dupliziert war.
+ * Shared logic for a delete-confirmation sheet: remembers the object to
+ * delete, deletes it via DELETE, and shows an error message directly in
+ * the sheet — in particular the 409 case, when deals still hang off the
+ * stage or pipeline. Consolidates the block that was practically
+ * duplicated 1:1 between pipeline and stage.
  *
- * @param {string} endpoint API-Pfad-Praefix, z. B. '/pipelines' oder '/stages'.
+ * @param {string} endpoint API path prefix, e.g. '/pipelines' or '/stages'.
  * @param {object} optionen
  * @param {(zumLoeschen: any) => string|number} optionen.holeId
- *        Liest die ID fuer den DELETE-Aufruf aus dem gemerkten Objekt.
+ *        Reads the ID for the DELETE call from the remembered object.
  * @param {() => Promise<void>} optionen.nachLoeschen
- *        Wird nach erfolgreichem Loeschen aufgerufen (z. B. laden()).
+ *        Called after a successful delete (e.g. laden()).
  */
 export function useLoeschenBestaetigung(endpoint, { holeId, nachLoeschen }) {
     const zumLoeschen = ref(null);
@@ -33,16 +33,16 @@ export function useLoeschenBestaetigung(endpoint, { holeId, nachLoeschen }) {
             zumLoeschen.value = null;
             await nachLoeschen();
         } catch (e) {
-            // Haengen noch Vorgaenge an der Phase oder Pipeline, antwortet die
-            // API mit 409 und einer verstaendlichen Meldung im Feld "detail" —
-            // die zeigen wir hier direkt im Blatt, statt es kommentarlos zu schliessen.
+            // If deals still hang off the stage or pipeline, the API responds
+            // with 409 and a readable message in the "detail" field — we show
+            // that directly in the sheet instead of just closing it silently.
             fehler.value = nachricht(e, 'Löschen hat nicht geklappt.');
         } finally {
             loescht.value = false;
         }
     }
 
-    // reactive() statt eines rohen Objekts aus Refs, damit z. B. "pipelineLoeschen.zumLoeschen"
-    // im Template automatisch entpackt wird (siehe useVerwaltungsBlatt.js).
+    // reactive() instead of a plain object of refs, so that e.g. "pipelineLoeschen.zumLoeschen"
+    // is auto-unwrapped in the template (same reasoning as in useVerwaltungsBlatt.js).
     return reactive({ zumLoeschen, loescht, fehler, fragen, bestaetigen });
 }

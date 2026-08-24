@@ -49,9 +49,9 @@ watch([suche, filter], () => {
 });
 onMounted(laden);
 
-/* Export: nutzt dieselben Filter wie die Liste gerade zeigt. Download über
-   Blob, damit der Authorization-Header mitgeht — ein einfacher Link würde
-   ohne Anmeldung landen (siehe PrivacyView.vue, auskunft()). */
+/* Export: uses the same filters the list is currently showing. Downloads
+   via a Blob so the Authorization header is sent — a plain link would
+   land on the login page (same pattern as PrivacyView.vue, auskunft()). */
 const exportOffen = ref(false);
 const exportLaeuft = ref(false);
 
@@ -235,7 +235,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px
     .export :deep(.btn) { width: 100%; }
 }
 
-/* Export: unauffälliger Knopf mit kleinem Auswahlmenü CSV/Excel. */
+/* Export: unobtrusive button with a small CSV/Excel selection menu. */
 .export { position: relative; }
 .export__menu {
     position: absolute; top: calc(100% + var(--sp-2)); right: 0; z-index: 10;
@@ -264,9 +264,9 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px
 
 .tabelle { background: var(--bg-elevated); border: 1px solid var(--separator); border-radius: var(--radius-l); overflow: hidden; }
 
-/* Handy: Tabellen sind auf Daumenbreite unlesbar — jede Zeile wird zur
-   Karte, die Spaltenueberschriften verschwinden, die Zellen bekommen ihre
-   Bedeutung ueber data-label. */
+/* Mobile: tables are unreadable at thumb width — every row becomes a
+   card, the column headers disappear, and the cells get their meaning
+   via data-label. */
 @media (max-width: 760px) {
     .tabelle { background: transparent; border: 0; border-radius: 0; }
     thead { display: none; }
@@ -281,8 +281,8 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px
         margin-bottom: var(--sp-2);
     }
     tbody tr:hover { background: var(--bg-elevated); }
-    /* Die Trennlinien der Tabelle muessen in der Kartenansicht weg —
-       sonst sieht die Karte aus wie eine Tabelle im Kleinen. */
+    /* The table's divider lines have to go in the card view —
+       otherwise the card looks like a miniature table. */
     td, tbody tr td { border-bottom: 0; padding: 0; }
     td:first-child { grid-column: 1 / -1; padding-bottom: var(--sp-1); }
     td[data-label]::before {
@@ -306,7 +306,7 @@ td { padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--separator)
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--fill-quaternary); }
 .name { display: block; font-weight: 600; color: var(--label-primary); }
-/* Die ganze Zeile fuehrt zum Kontakt — auf dem Handy die ganze Karte. */
+/* The whole row leads to the contact — on mobile, the whole card. */
 .klickbar { cursor: pointer; }
 .klickbar:hover .name { color: var(--accent); }
 td .t-footnote { display: block; }

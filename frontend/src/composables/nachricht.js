@@ -1,8 +1,8 @@
 /**
- * Liest eine API-Fehlermeldung aus der Antwort (RFC7807-Feld "detail" bzw.
- * Hydra-Feld "hydra:description") und faellt sonst auf eine Standardmeldung
- * zurueck. Wird von den Verwaltungs-Composables und direkt in Views genutzt,
- * die eigene Fehlerfaelle behandeln (z. B. der Reihenfolge-Tausch).
+ * Reads an API error message from the response (RFC7807 field "detail" or
+ * the Hydra field "hydra:description") and otherwise falls back to a
+ * default message. Used by the management composables and directly in
+ * views that handle their own error cases (e.g. the reorder swap).
  */
 export function nachricht(e, standard) {
     return e?.response?.data?.detail

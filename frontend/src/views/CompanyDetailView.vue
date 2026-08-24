@@ -13,8 +13,8 @@ import { ART } from '../labels.js';
 import { datum, geld } from '../format.js';
 
 /**
- * Kundenakte einer Firma: alles, was zu diesem Kunden gehört, auf einer
- * Seite — Personen, Vorgänge, Verlauf, Kennzahlen.
+ * Customer file for a company: everything belonging to this customer on
+ * one page — people, deals, history, key figures.
  */
 
 const route = useRoute();
@@ -53,8 +53,8 @@ async function laden() {
 onMounted(laden);
 watch(() => route.params.id, laden);
 
-/* Personen nach Abteilung gruppieren; Hauptansprechpartner steht oben.
-   So sieht man auf einen Blick, wer wofür zuständig ist. */
+/* Group people by department; the primary contact is listed first.
+   That way it's visible at a glance who's responsible for what. */
 const nachAbteilung = computed(() => {
     const gruppen = new Map();
     [...kontakte.value]
@@ -65,7 +65,7 @@ const nachAbteilung = computed(() => {
             if (!gruppen.has(schl)) gruppen.set(schl, []);
             gruppen.get(schl).push(k);
         });
-    // "Ohne Abteilung" ans Ende — benannte Abteilungen sind aussagekräftiger.
+    // "No department" goes last — named departments are more informative.
     return [...gruppen.entries()].sort((a, b) =>
         (a[0] === 'Ohne Abteilung') - (b[0] === 'Ohne Abteilung') || a[0].localeCompare(b[0]));
 });
@@ -95,27 +95,27 @@ async function personSpeichern() {
     }
 }
 
-/* Hauptansprechpartner umsetzen: der bisherige verliert die Markierung,
-   damit es immer genau einen gibt. */
+/* Reassign the primary contact: the previous one loses the flag, so
+   there is always exactly one. */
 async function alsHauptansprechpartner(k) {
-    // Ein einziger Aufruf: der Server setzt den bisherigen Hauptkontakt in
-    // derselben Transaktion zurueck. Frueher liefen dafuer mehrere PATCHes
-    // parallel — schlug einer fehl, blieb ein zerrissener Stand zurueck.
+    // A single call: the server resets the previous primary contact in
+    // the same transaction. This used to be several parallel PATCHes —
+    // if one failed, the data was left in an inconsistent state.
     try {
         await api.patch(`/contacts/${k.id}`, { primaryContact: true },
             { headers: { 'Content-Type': 'application/merge-patch+json' } });
     } catch (e) {
         fehler.value = 'Die Änderung hat nicht geklappt.';
     } finally {
-        // Immer neu laden — auch im Fehlerfall, damit der echte Serverstand
-        // sichtbar wird statt eines geratenen.
+        // Always reload — even on failure — so the actual server state is
+        // shown instead of a guessed one.
         await laden();
     }
 }
 
 const offen = computed(() => vorgaenge.value.filter((d) => d.open));
 const offenerWert = computed(() => geld.format(offen.value.reduce((s, d) => s + Number(d.value || 0), 0)));
-// Nicht der Name der Phase entscheidet, sondern ihre Art (siehe A5).
+// It's not the stage's name that decides this, but its type (Stage.art).
 const gewonnen = computed(() => vorgaenge.value.filter((d) => d.stage?.art === 'gewonnen'));
 const gewonnenerWert = computed(() => geld.format(gewonnen.value.reduce((s, d) => s + Number(d.value || 0), 0)));
 const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactable).length);

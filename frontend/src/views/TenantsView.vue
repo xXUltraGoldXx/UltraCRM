@@ -25,7 +25,7 @@ async function laden() {
 }
 onMounted(laden);
 
-// Kennung aus dem Namen ableiten, damit niemand raten muss, was erlaubt ist.
+// Derive the slug from the name, so nobody has to guess what's allowed.
 function slugAus(name) {
     return name.toLowerCase()
         .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')

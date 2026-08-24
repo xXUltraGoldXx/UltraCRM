@@ -1,6 +1,6 @@
 <script setup>
-// Reduziertes Strich-Icon-Set (1.75px, runde Enden). Bewusst kein
-// Emoji und keine Icon-Library: wenige, ruhige Formen passen zur HIG.
+// Minimal stroke icon set (1.75px, round caps). Deliberately no emoji
+// and no icon library: a few calm shapes that fit the HIG.
 defineProps({ name: { type: String, required: true }, size: { type: [Number, String], default: 20 } });
 
 const paths = {

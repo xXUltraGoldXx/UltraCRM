@@ -3,20 +3,20 @@ import api from '../api';
 import { nachricht } from './nachricht.js';
 
 /**
- * Gemeinsame Logik fuer ein Anlegen/Bearbeiten-Blatt: Blatt-Status, Entwurf
- * und Speichern (PATCH beim Bearbeiten, POST beim Anlegen). Fasst den Block
- * zusammen, der bei Pipeline und Phase praktisch 1:1 dupliziert war.
+ * Shared logic for a create/edit sheet: sheet state, draft, and saving
+ * (PATCH when editing, POST when creating). Consolidates the block that
+ * was practically duplicated 1:1 between pipeline and stage.
  *
- * @param {string} endpoint API-Pfad-Praefix, z. B. '/pipelines' oder '/stages'.
+ * @param {string} endpoint API path prefix, e.g. '/pipelines' or '/stages'.
  * @param {object} optionen
  * @param {(kontext: any) => object} optionen.leererEntwurf
- *        Liefert den leeren Entwurf fuer "neu" (kontext optional, z. B. ungenutzt).
+ *        Returns the empty draft for "new" (kontext optional, e.g. unused).
  * @param {(entwurf: object) => object} optionen.patchDaten
- *        Baut die Nutzlast fuer PATCH beim Bearbeiten.
+ *        Builds the PATCH payload for editing.
  * @param {(entwurf: object, kontext: any) => object} optionen.postDaten
- *        Baut die Nutzlast fuer POST beim Anlegen.
+ *        Builds the POST payload for creating.
  * @param {() => Promise<void>} optionen.nachSpeichern
- *        Wird nach erfolgreichem Speichern aufgerufen (z. B. laden()).
+ *        Called after a successful save (e.g. laden()).
  */
 export function useVerwaltungsBlatt(endpoint, { leererEntwurf, patchDaten, postDaten, nachSpeichern }) {
     const offen = ref(false);
@@ -62,8 +62,8 @@ export function useVerwaltungsBlatt(endpoint, { leererEntwurf, patchDaten, postD
         }
     }
 
-    // reactive() statt eines rohen Objekts aus Refs, damit z. B. "pipelineBlatt.offen"
-    // im Template automatisch entpackt wird — verschachtelte Refs werden nur dann
-    // ohne ".value" gelesen/geschrieben, wenn das umschliessende Objekt reaktiv ist.
+    // reactive() instead of a plain object of refs, so that e.g. "pipelineBlatt.offen"
+    // is auto-unwrapped in the template — nested refs are only read/written
+    // without ".value" when the containing object is itself reactive.
     return reactive({ offen, bearbeiteId, entwurf, kontext, speichert, fehler, neu, bearbeiten, speichern });
 }

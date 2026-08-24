@@ -6,10 +6,10 @@ import { FELDNAMEN } from '../labels.js';
 import { datum } from '../format.js';
 
 /**
- * Änderungsprotokoll eines Kontakts, einer Firma oder eines Vorgangs. Laedt
- * sich selbst und zeigt sich gar nicht erst an — weder Eintraege noch (mangels
- * privacy.view) eine Fehlermeldung. So kann jede Detailansicht dieselbe
- * Anzeige einfach einbinden, ohne selbst zu laden.
+ * Change log of a contact, a company or a deal. Loads its own data and,
+ * lacking the privacy.view permission, simply renders nothing — neither
+ * entries nor an error message. This lets every detail view embed the
+ * same display without loading anything itself.
  */
 const props = defineProps({
     subjectType: { type: String, required: true }, // contact | company | deal
@@ -25,8 +25,8 @@ async function laden() {
         });
         aenderungen.value = data['hydra:member'] ?? data.member ?? [];
     } catch (e) {
-        // Ohne das Recht privacy.view antwortet die API mit 403 — dann eben
-        // ohne Protokoll, statt einer Fehlermeldung.
+        // Without the privacy.view permission the API returns 403 — in that
+        // case just show no log instead of an error message.
         aenderungen.value = [];
     }
 }

@@ -32,8 +32,8 @@ async function laden() {
 }
 onMounted(laden);
 
-/* Auskunft als Datei — der Browser laedt sie ueber einen Blob, damit der
-   Authorization-Header mitgeht (ein einfacher Link kann das nicht). */
+/* Data disclosure as a file — the browser downloads it via a Blob so the
+   Authorization header is sent (a plain link can't do that). */
 async function auskunft(k) {
     try {
         const { data } = await api.get(`/privacy/contacts/${k.id}/export`);
@@ -60,8 +60,8 @@ async function widerrufen(k) {
     }
 }
 
-/* Löschen ist unumkehrbar — deshalb ein eigenes Blatt mit Warnung und
-   Pflichtgrund statt eines Browser-Dialogs, den man wegklickt. */
+/* Deleting is irreversible — hence a dedicated sheet with a warning and a
+   required reason, instead of a browser dialog that gets clicked away. */
 const loeschBlatt = ref(null);
 const loeschGrund = ref('');
 const loeschLaeuft = ref(false);

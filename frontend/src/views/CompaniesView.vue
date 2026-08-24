@@ -10,7 +10,7 @@ import UiSheet from '../components/ui/UiSheet.vue';
 
 const auth = useAuthStore();
 const firmen = ref([]);
-const zaehler = ref({});   // firmaId -> Anzahl Personen
+const zaehler = ref({});   // companyId -> contact count
 const suche = ref('');
 const fehler = ref('');
 const anlegen = ref(false);
@@ -25,8 +25,8 @@ async function laden() {
         firmen.value = data['hydra:member'] ?? data.member ?? [];
         fehler.value = '';
 
-        // Personenzahl je Firma — ein Aufruf je Firma waere zu viel, deshalb
-        // einmal alle Kontakte holen und zaehlen.
+        // Contact count per company — one request per company would be too many,
+        // so fetch all contacts once and count them.
         const { data: k } = await api.get('/contacts', { params: { itemsPerPage: 200 } });
         const alle = k['hydra:member'] ?? k.member ?? [];
         const map = {};
@@ -43,9 +43,9 @@ let timer;
 watch(suche, () => { clearTimeout(timer); timer = setTimeout(laden, 250); });
 onMounted(laden);
 
-/* Export: nutzt dieselbe Suche wie die Liste gerade zeigt. Download über
-   Blob, damit der Authorization-Header mitgeht — ein einfacher Link würde
-   ohne Anmeldung landen (siehe PrivacyView.vue, auskunft()). */
+/* Export: uses the same search the list is currently showing. Downloads
+   via a Blob so the Authorization header is sent — a plain link would
+   land on the login page (same pattern as PrivacyView.vue, auskunft()). */
 const exportOffen = ref(false);
 const exportLaeuft = ref(false);
 
@@ -162,7 +162,7 @@ async function speichern() {
 }
 .suche input { border: 0; background: transparent; outline: none; font-family: inherit; font-size: var(--text-subhead); color: var(--label-primary); width: 100%; }
 
-/* Export: unauffälliger Knopf mit kleinem Auswahlmenü CSV/Excel. */
+/* Export: unobtrusive button with a small CSV/Excel selection menu. */
 .export { position: relative; }
 .export__menu {
     position: absolute; top: calc(100% + var(--sp-2)); right: 0; z-index: 10;

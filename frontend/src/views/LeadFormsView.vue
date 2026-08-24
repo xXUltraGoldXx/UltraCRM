@@ -38,8 +38,8 @@ async function speichern() {
     }
 }
 
-/* Fertiges HTML zum Einbetten. Bewusst ohne Framework und ohne externe
-   Skripte — das laeuft in jeder Website, auch in einer alten. */
+/* Ready-made HTML for embedding. Deliberately without a framework and
+   without external scripts — this runs on any website, even an old one. */
 function schnipsel(f) {
     return `<form id="ug-lead" style="max-width:420px;display:grid;gap:12px">
   <input type="hidden" name="token" value="${f.token}">
