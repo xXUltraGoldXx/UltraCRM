@@ -17,16 +17,17 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Ein Kontakt (Person).
+ * A contact (person).
  *
- * Die DSGVO-Felder sind bewusst Teil der Entity und nicht Nachtrag:
- * - source        Woher stammt der Datensatz? (Pflicht — Art. 14 verlangt,
- *                 dass die Herkunft benennbar ist)
- * - consentGivenAt/consentText  Einwilligung mit Zeitpunkt und Wortlaut;
- *                 der Wortlaut wird mitgeschrieben, weil ein spaeter
- *                 geaenderter Text die alte Einwilligung nicht belegen kann
- * - consentWithdrawnAt  Widerruf; ab dann darf nicht mehr geworben werden
- * - deleteAfter   Loeschvormerkung (Aufbewahrung endet)
+ * The GDPR fields are deliberately part of the entity, not an afterthought:
+ * - source        Where the record came from (mandatory — GDPR Art. 14
+ *                 requires that the origin be identifiable)
+ * - consentGivenAt/consentText  Consent with timestamp and wording; the
+ *                 wording is stored because a later-changed text could not
+ *                 prove what the original consent covered
+ * - consentWithdrawnAt  Withdrawal; from this point on, no more marketing
+ *                 is allowed
+ * - deleteAfter   Scheduled deletion (retention ends)
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'contact')]
@@ -51,13 +52,13 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(OrderFilter::class, properties: ['lastName', 'createdAt', 'status', 'primaryContact', 'department'])]
 class Contact implements TenantOwnedInterface
 {
-    /** Bearbeitungsstand im Vertrieb. */
+    /** Sales pipeline status. */
     public const STATUS = ['neu', 'in_kontakt', 'qualifiziert', 'kunde', 'kein_interesse'];
 
-    /** Woher der Datensatz stammt — fuer die Auskunftspflicht. */
+    /** Where the record came from — needed for GDPR disclosure requests. */
     public const SOURCES = ['formular', 'telefon', 'messe', 'empfehlung', 'eigene_recherche', 'import', 'sonstiges'];
 
-    /** Standardfrist fuer die Loeschvormerkung, wenn niemand eine eigene eintraegt. */
+    /** Default retention period for the deletion flag, when nobody sets their own. */
     public const STANDARD_LOESCHFRIST = '+30 days';
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column]
@@ -91,18 +92,18 @@ class Contact implements TenantOwnedInterface
     private ?string $position = null;
 
     /**
-     * Abteilung innerhalb der Firma (Vertrieb, Technik, Buchhaltung …).
-     * Freitext statt fester Liste: jede Firma schneidet ihre Abteilungen
-     * anders zu, eine erzwungene Auswahl passt selten.
+     * Department within the company (sales, engineering, accounting, …).
+     * Free text instead of a fixed list: every company slices its
+     * departments differently, so a forced selection rarely fits.
      */
     #[ORM\Column(length: 120, nullable: true)]
     #[Groups(['contact:read', 'contact:write'])]
     private ?string $department = null;
 
     /**
-     * Hauptansprechpartner der Firma. Es kann mehrere Personen geben, aber
-     * nur eine ist die erste Adresse — das steht sonst nur im Kopf des
-     * Vertrieblers.
+     * Primary contact person for the company. There can be several people,
+     * but only one is the first point of contact — otherwise that fact
+     * only lives in the salesperson's head.
      */
     #[ORM\Column]
     #[Groups(['contact:read', 'contact:write'])]
@@ -141,15 +142,15 @@ class Contact implements TenantOwnedInterface
     private ?\DateTimeImmutable $deleteAfter = null;
 
     /**
-     * Bestaetigte Einwilligung (Double-Opt-in). Erst wenn der Empfaenger den
-     * Link in der Bestaetigungsmail geklickt hat, ist belegt, dass die
-     * Adresse wirklich ihm gehoert.
+     * Confirmed consent (double opt-in). Only once the recipient has
+     * clicked the link in the confirmation email is it proven that the
+     * address really belongs to them.
      */
     #[ORM\Column(nullable: true)]
     #[Groups(['contact:read'])]
     private ?\DateTimeImmutable $consentConfirmedAt = null;
 
-    /** Einmal-Token fuer den Bestaetigungslink. */
+    /** One-time token for the confirmation link. */
     #[ORM\Column(length: 64, nullable: true)]
     private ?string $confirmToken = null;
 
@@ -158,8 +159,8 @@ class Contact implements TenantOwnedInterface
     private ?string $notes = null;
 
     /**
-     * Werte der selbst angelegten Zusatzfelder, als JSON am Datensatz.
-     * Geprueft wird serverseitig gegen CustomFieldDefinition — siehe
+     * Values of the self-defined custom fields, stored as JSON on the
+     * record. Validated server-side against CustomFieldDefinition — see
      * CustomFieldValidator.
      */
     #[ORM\Column(type: 'json', nullable: true)]
@@ -174,19 +175,19 @@ class Contact implements TenantOwnedInterface
     {
         $this->createdAt = new \DateTimeImmutable();
 
-        // "30 Tage, wenn nichts anderes eingestellt wird" (Alexander, 24.08.).
-        // Nur ein Vorschlag, keine automatische Loeschung: der Kontakt taucht
-        // damit in /api/privacy/due-deletions zur Pruefung auf, geloescht
-        // wird weiterhin nur von Hand ueber /erase. Gilt fuer jeden Weg, auf
-        // dem ein Kontakt entsteht (Formular, API, Import) — kommt ein Wert
-        // vom Client mit (contact:write), ueberschreibt der Denormalizer
-        // diesen Standard danach ganz regulaer.
+        // Default of 30 days when nothing else is configured. This is only
+        // a suggestion, not an automatic deletion: it makes the contact
+        // show up in /api/privacy/due-deletions for review, actual
+        // deletion is still always done by hand via /erase. This applies
+        // no matter how a contact is created (form, API, import) — if the
+        // client sends its own value (contact:write), the denormalizer
+        // overwrites this default normally afterwards.
         $this->deleteAfter = new \DateTimeImmutable(self::STANDARD_LOESCHFRIST);
     }
 
     /**
-     * Darf dieser Kontakt fuer Werbung angeschrieben werden?
-     * Einwilligung erteilt und nicht widerrufen — im Zweifel nein.
+     * May this contact be contacted for marketing?
+     * Consent given and not withdrawn — when in doubt, no.
      */
     #[Groups(['contact:read'])]
     public function isContactable(): bool
@@ -195,13 +196,12 @@ class Contact implements TenantOwnedInterface
             return false;
         }
 
-        // Wurde ein Bestaetigungslink verschickt, zaehlt die Einwilligung erst
-        // nach dem Klick. Kontakte ohne offenen Token (z.B. auf einer Messe
-        // unterschrieben) bleiben unberuehrt.
+        // If a confirmation link was sent, consent only counts once the
+        // link has been clicked. Contacts without an open token (e.g.
+        // signed up at a trade fair) are unaffected.
         return $this->confirmToken === null || $this->consentConfirmedAt !== null;
     }
 
-    /** Wartet dieser Kontakt noch auf seine Bestaetigung? */
     #[Groups(['contact:read'])]
     public function isAwaitingConfirmation(): bool
     {

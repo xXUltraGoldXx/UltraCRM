@@ -15,7 +15,7 @@ use Symfony\Component\HttpKernel\Attribute\IsGranted;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
-/** Testversand, damit Fehlkonfiguration sofort auffaellt statt beim Kunden. */
+/** Test send, so misconfiguration shows up immediately instead of with a customer. */
 #[IsGranted('ROLE_ADMIN')]
 final class MailController extends AbstractController
 {
@@ -54,10 +54,10 @@ final class MailController extends AbstractController
         );
 
         if ($fehler !== null) {
-            // Rohe Mailer-Meldungen koennen Serverpfade, DNS- und TLS-Details
-            // preisgeben — die gehoeren ins Log, nicht zum Client
-            // (Review-Befund 20). Nur die vom eigenen Code stammenden,
-            // bewusst formulierten Hinweise werden durchgereicht.
+            // Raw mailer messages can expose server paths, DNS and TLS
+            // details — those belong in the log, not with the client.
+            // Only the deliberately worded messages coming from our own
+            // code are passed through.
             $this->logger->error('Testmail fehlgeschlagen', ['grund' => $fehler]);
 
             $verstaendlich = str_starts_with($fehler, 'Es ist kein Server')

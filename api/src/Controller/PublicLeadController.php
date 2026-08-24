@@ -15,21 +15,21 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
- * Oeffentliche Lead-Annahme — der einzige Endpunkt ohne Anmeldung.
+ * Public lead intake — the only endpoint without authentication.
  *
- * Grundsaetze:
- * - Der Mandant kommt ausschliesslich ueber den Formular-Token, nie aus dem
- *   Request. Sonst koennte jeder Leads in fremde Mandanten schreiben.
- * - Der Doctrine-Mandantenfilter wuerde bei anonymen Anfragen alles
- *   ausblenden (tenant_id = 0). Er wird deshalb fuer die Token-Suche gezielt
- *   und nur dort ausgeschaltet.
- * - Nach aussen wird moeglichst wenig verraten: unbekannter Token und
- *   deaktiviertes Formular sind beide 404, ein Bot-Treffer sieht aus wie
- *   Erfolg.
+ * Principles:
+ * - The tenant comes exclusively from the form token, never from the
+ *   request. Otherwise anyone could write leads into a foreign tenant.
+ * - The Doctrine tenant filter would hide everything on anonymous
+ *   requests (tenant_id = 0). It is therefore switched off deliberately,
+ *   and only for the token lookup.
+ * - As little as possible is revealed to the outside: an unknown token
+ *   and a deactivated form both return 404, and a bot hit looks like
+ *   success.
  */
 final class PublicLeadController extends AbstractPublicController
 {
-    /** Hoechstens so viele Einsendungen je IP innerhalb des Zeitfensters. */
+    /** Maximum submissions per IP within the time window. */
     private const MAX_ATTEMPTS = 5;
     private const WINDOW_MINUTES = 10;
 
@@ -49,7 +49,7 @@ final class PublicLeadController extends AbstractPublicController
             return $this->fehler('Die Anfrage konnte nicht gelesen werden.', 400);
         }
 
-        // 1) Rate-Limit vor jeder Datenbankarbeit am Inhalt.
+        // 1) Rate limit before any database work on the content.
         $ipHash = hash('sha256', ($request->getClientIp() ?? 'unbekannt') . '|' . $this->appSecret);
         if ($this->zuVieleVersuche($ipHash)) {
             return $this->fehler('Zu viele Einsendungen. Bitte später erneut versuchen.', 429);
@@ -57,19 +57,20 @@ final class PublicLeadController extends AbstractPublicController
         $this->em->persist(new LeadAttempt($ipHash));
         $this->em->flush();
 
-        // 2) Honeypot: ein fuer Menschen unsichtbares Feld. Ist es gefuellt,
-        //    war es ein Bot — wir antworten wie bei Erfolg, damit er nichts lernt.
+        // 2) Honeypot: a field invisible to humans. If it is filled in,
+        //    it was a bot — we respond as if it succeeded so it learns
+        //    nothing.
         if (trim((string) ($data['website'] ?? '')) !== '') {
             return new JsonResponse(['status' => 'ok'], 202);
         }
 
-        // 3) Mandant ueber den Token bestimmen (Filter dafuer kurz aus).
+        // 3) Determine the tenant via the token (filter briefly off for this).
         $form = $this->formularZuToken((string) ($data['token'] ?? ''));
         if ($form === null) {
             return $this->fehler('Formular nicht gefunden.', 404);
         }
 
-        // 4) Einwilligung ist Pflicht — ohne sie darf niemand kontaktiert werden.
+        // 4) Consent is mandatory — nobody may be contacted without it.
         if (($data['consent'] ?? false) !== true) {
             return $this->fehler('Ohne Einwilligung können wir die Anfrage nicht speichern.', 422);
         }
@@ -92,8 +93,8 @@ final class PublicLeadController extends AbstractPublicController
 
         $this->em->persist($kontakt);
 
-        // Nachricht als erste Aktivitaet — sie gehoert zum Kontakt, nicht in
-        // ein Notizfeld, damit sie im Verlauf auftaucht.
+        // Message as the first activity — it belongs to the contact, not
+        // in a notes field, so it shows up in the history.
         $nachricht = $this->kurz($data['message'] ?? null, 4000);
         if ($nachricht !== null) {
             $this->em->persist(
@@ -106,25 +107,25 @@ final class PublicLeadController extends AbstractPublicController
             );
         }
 
-        // Double-Opt-in: Wer eine Adresse angegeben hat, bekommt einen
-        // Bestaetigungstoken — auch dann, wenn der Mandant (noch) keinen
-        // Versandweg hinterlegt hat.
+        // Double opt-in: whoever gave an address gets a confirmation
+        // token — even when the tenant has no mail transport configured
+        // (yet).
         //
-        // Vorher wurde der Token in diesem Fall weggelassen, damit der
-        // Kontakt nicht "unbenutzbar" bleibt. Das hiess aber: solange kein
-        // SMTP eingerichtet ist, gilt jeder Formular-Lead sofort als
-        // bewerbbar, ohne dass irgendjemand bestaetigt hat. Das ist die
-        // bequeme Richtung, nicht die sichere — und es trifft genau den
-        // Zustand eines frisch eingerichteten Mandanten (Analyse.md C33).
+        // This token used to be skipped in that case, so the contact
+        // would not stay "unusable". But that meant: as long as no SMTP
+        // is configured, every form lead instantly counts as fine to
+        // market to, without anyone ever having confirmed it. That is
+        // the convenient direction, not the safe one — and it hits
+        // exactly the state of a freshly set up tenant.
         $setting = $this->mailer->findSetting($form->getTenant());
         if ($kontakt->getEmail()) {
             $token = bin2hex(random_bytes(24));
             $kontakt->setConfirmToken($token);
 
             if ($setting === null) {
-                // Kein Versandweg: die Bestaetigung kann niemand anfordern.
-                // Das darf nicht still passieren, sonst wundert sich der
-                // Mandant, warum seine Leads nie freigegeben werden.
+                // No mail transport: nobody can request the confirmation.
+                // This must not happen silently, or the tenant will
+                // wonder why their leads never get approved.
                 $this->em->persist(
                     (new Activity())
                         ->setTenant($form->getTenant())
@@ -154,12 +155,11 @@ final class PublicLeadController extends AbstractPublicController
                 . $link . "\n\nWenn Sie das nicht waren, ignorieren Sie diese Nachricht einfach.\n",
             );
 
-            // Scheitert der Versand, bleibt der Token bestehen. Ihn zu
-            // loeschen wuerde den Kontakt sofort kontaktierbar machen,
-            // OHNE dass je jemand bestaetigt hat — genau das, wogegen das
-            // Double-Opt-in schuetzt (Review-Befund, Schwere 58).
-            // Stattdessen wird der Fehlschlag als Aktivitaet sichtbar
-            // gemacht, damit ihn jemand bearbeiten kann.
+            // If sending fails, the token stays in place. Deleting it
+            // would make the contact immediately contactable WITHOUT
+            // anyone ever having confirmed it — exactly what double
+            // opt-in protects against. Instead, the failure is surfaced
+            // as an activity so someone can act on it.
             if ($fehler !== null) {
                 $this->em->persist(
                     (new Activity())
@@ -183,15 +183,15 @@ final class PublicLeadController extends AbstractPublicController
     }
 
     /**
-     * Bestaetigungslink aus der Opt-in-Mail. Bewusst GET: der Empfaenger
-     * klickt in seinem Mailprogramm.
+     * Confirmation link from the opt-in mail. Deliberately GET: the
+     * recipient clicks it in their mail client.
      */
     #[Route('/api/public/leads/confirm/{token}', name: 'public_lead_confirm', methods: ['GET'])]
     public function confirm(string $token, Request $request): Response
     {
-        // Auch hier begrenzen: die Token-Suche laeuft ohne Mandantenfilter
-        // ueber die gesamte Tabelle. Ohne Limit koennte man mit zufaelligen
-        // Tokens beliebig teure Abfragen ausloesen (Review-Befund 55).
+        // Rate-limit here too: the token lookup runs without the tenant
+        // filter across the entire table. Without a limit, random tokens
+        // could be used to trigger arbitrarily expensive queries.
         $ipHash = hash('sha256', ($request->getClientIp() ?? 'unbekannt') . '|' . $this->appSecret);
         if ($this->zuVieleVersuche($ipHash, 20)) {
             return new Response(
@@ -215,14 +215,14 @@ final class PublicLeadController extends AbstractPublicController
         if ($kontakt->getConsentConfirmedAt() === null) {
             $kontakt->setConsentConfirmedAt(new \DateTimeImmutable());
         }
-        // Token entwerten — ein Bestaetigungslink gilt genau einmal.
+        // Invalidate the token — a confirmation link is valid exactly once.
         $kontakt->setConfirmToken(null);
         $this->em->flush();
 
         return new Response($this->seite('Vielen Dank', 'Ihre Anfrage ist bestätigt. Wir melden uns.'), 200, ['Content-Type' => 'text/html; charset=utf-8']);
     }
 
-    /** Schlichte Bestaetigungsseite — kein Framework, keine externen Dateien. */
+    /** Plain confirmation page — no framework, no external files. */
     private function seite(string $titel, string $text): string
     {
         return sprintf(

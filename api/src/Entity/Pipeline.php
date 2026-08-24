@@ -16,15 +16,16 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Ein Vertriebsprozess mit eigenen Phasen.
+ * A sales process with its own stages.
  *
- * Vorher waren die Phasen feste Konstanten in Deal. Damit liess sich das
- * CRM nur fuer genau einen Prozess benutzen — ein Betrieb, der Neukunden
- * anders fuehrt als Wartungsvertraege, brauchte zwei Systeme.
+ * The stages used to be fixed constants on Deal. That meant the CRM could
+ * only be used for exactly one process — a business handling new
+ * customers differently from maintenance contracts needed two systems.
  *
- * Welche Pipeline die "erste" ist, entscheidet position. Ein eigenes
- * Standard-Kennzeichen gibt es bewusst nicht: es waere eine zweite Quelle
- * fuer dieselbe Aussage und muesste bei jeder Aenderung mitgepflegt werden.
+ * Which pipeline is the "first" one is decided by position. There is
+ * deliberately no separate default flag: it would be a second source of
+ * truth for the same fact and would need to be kept in sync on every
+ * change.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'pipeline')]
@@ -34,8 +35,9 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Get(security: "is_granted('PERM', 'deals.view')"),
         new Post(security: "is_granted('PERM', 'pipelines.manage')"),
         new Patch(security: "is_granted('PERM', 'pipelines.manage')"),
-        // Loeschen ist unumkehrbar und nimmt bei einer Pipeline alle Phasen
-        // mit — dieselbe Huerde wie bei Kontakt, Firma und Vorgang (C17).
+        // Deletion is irreversible and takes all of a pipeline's stages
+        // with it — the same safeguard used for contact, company, and
+        // deal deletion.
         new Delete(security: "is_granted('PERM', 'pipelines.delete')", processor: PipelineRemoveProcessor::class),
     ],
     normalizationContext: ['groups' => ['pipeline:read']],

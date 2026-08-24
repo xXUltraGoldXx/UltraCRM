@@ -11,10 +11,10 @@ use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Email;
 
 /**
- * Baut den Versandweg zur Laufzeit aus der Mandanten-Einstellung.
+ * Builds the mail transport at runtime from the tenant's settings.
  *
- * Bewusst kein global konfigurierter Mailer: sonst wuerden alle Mandanten
- * ueber denselben Absender verschicken.
+ * Deliberately no globally configured mailer: otherwise all tenants would
+ * send through the same sender.
  */
 final class MailerFactory
 {
@@ -30,17 +30,16 @@ final class MailerFactory
             return null;
         }
 
-        // Der Mandantenfilter steht bei einer anonymen Anfrage (oeffentlicher
-        // Lead-Endpunkt, Cron ohne angemeldeten Benutzer) auf "zu" (tenant_id
-        // = 0, TenantFilterSubscriber) — er wird NICHT einfach ignoriert, nur
-        // weil hier zusaetzlich explizit nach $tenant gefiltert wird. Beide
-        // Bedingungen werden von Doctrine UND-verknuepft, also
-        // "tenant = 3 AND tenant_id = 0", was nie zutrifft. Ohne dieses
-        // Abschalten fand der oeffentliche Lead-Endpunkt seinen eigenen
-        // Versandweg nie — live entdeckt: Testmail ueber /api/mail/test (mit
-        // angemeldetem Benutzer, Filter korrekt auf den echten Mandanten)
-        // gelang, dieselbe Einstellung blieb aus dem anonymen Lead-Endpunkt
-        // heraus unsichtbar (Analyse.md C44).
+        // For an anonymous request (public lead endpoint, cron without a
+        // logged-in user), the tenant filter defaults to closed (tenant_id
+        // = 0, see TenantFilterSubscriber) — it is NOT simply ignored just
+        // because $tenant is also explicitly filtered on here. Doctrine
+        // ANDs both conditions together, i.e. "tenant = 3 AND tenant_id =
+        // 0", which never matches. Without disabling it, the public lead
+        // endpoint could never find its own mail settings — discovered in
+        // production: a test mail via /api/mail/test (with a logged-in
+        // user, filter correctly set to the real tenant) worked, while the
+        // same setting stayed invisible from the anonymous lead endpoint.
         $filters = $this->em->getFilters();
         $warAn = $filters->isEnabled('tenant_filter');
         if ($warAn) {
@@ -52,15 +51,15 @@ final class MailerFactory
                 ->findOneBy(['tenant' => $tenant, 'active' => true]);
         } finally {
             if ($warAn) {
-                // enable() nach disable() liefert eine NEUE Filterinstanz
-                // ohne Parameter zurueck (C32) — deshalb hier erneut setzen,
-                // nicht einfach enable() allein aufrufen.
+                // enable() after disable() returns a NEW filter instance
+                // with no parameter set — so it has to be set again here,
+                // not just call enable() alone.
                 $filters->enable('tenant_filter')->setParameter('tenant_id', '0');
             }
         }
     }
 
-    /** @throws \RuntimeException wenn kein brauchbarer Versandweg hinterlegt ist */
+    /** @throws \RuntimeException if no usable mail transport is configured */
     public function build(MailSetting $setting): MailerInterface
     {
         $host = $setting->getProvider() === 'mailjet'
@@ -75,9 +74,10 @@ final class MailerFactory
 
         $passwort = $this->secretBox->decrypt($setting->getSecret());
         if ($setting->getUsername() && $passwort === null) {
-            // Zwei sehr verschiedene Ursachen, zwei verschiedene Meldungen:
-            // gar kein Passwort hinterlegt ist der Normalfall beim Einrichten,
-            // ein unlesbares deutet auf einen gewechselten Anwendungsschlüssel.
+            // Two very different causes, two different messages: no
+            // password stored at all is the normal case while setting
+            // things up; an unreadable one points to a changed
+            // application secret.
             throw new \RuntimeException(
                 $setting->getSecret() === null || $setting->getSecret() === ''
                     ? 'Für diesen Benutzernamen ist kein Passwort hinterlegt. Bitte eines eintragen.'
@@ -99,10 +99,10 @@ final class MailerFactory
     }
 
     /**
-     * Verhindert, dass ueber die Mail-Einstellung interne Adressen
-     * angesprochen werden (SSRF, Review-Befund 45). Ein Mailserver steht im
-     * Internet — Loopback, private Netze und Cloud-Metadaten haben dort
-     * nichts zu suchen.
+     * Prevents the mail settings from being used to reach internal
+     * addresses (SSRF). A mail server lives on the public internet —
+     * loopback addresses, private networks, and cloud metadata endpoints
+     * have no business being targeted here.
      */
     private function pruefeHost(string $host): void
     {
@@ -123,8 +123,8 @@ final class MailerFactory
             throw new \RuntimeException('Der Servername sieht nicht wie ein gültiger Hostname aus.');
         }
 
-        // Auch ein Name kann auf eine interne Adresse zeigen — deshalb wird
-        // aufgeloest und das Ergebnis geprueft.
+        // A hostname can resolve to an internal address too — so it's
+        // resolved and the result is checked.
         foreach ((array) gethostbynamel($host) as $ip) {
             if (filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE) === false) {
                 throw new \RuntimeException('Dieser Server verweist auf eine interne Adresse und ist nicht zulässig.');
@@ -138,8 +138,8 @@ final class MailerFactory
     }
 
     /**
-     * Verschickt und gibt bei Misserfolg eine verstaendliche Meldung zurueck,
-     * statt eine Exception nach aussen durchzureichen.
+     * Sends the mail and returns a readable message on failure, instead
+     * of letting an exception propagate outward.
      */
     public function send(MailSetting $setting, string $an, string $betreff, string $text): ?string
     {

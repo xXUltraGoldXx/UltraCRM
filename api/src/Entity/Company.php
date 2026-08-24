@@ -18,7 +18,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
-/** Firma (Organisation). Kontakte haengen optional an einer Firma. */
+/** A company (organization). Contacts may optionally belong to a company. */
 #[ORM\Entity]
 #[ORM\Table(name: 'company')]
 #[ApiResource(
@@ -71,7 +71,7 @@ class Company implements TenantOwnedInterface
     #[Groups(['company:read', 'company:write'])]
     private ?string $notes = null;
 
-    /** Werte der Zusatzfelder, geprueft gegen CustomFieldDefinition. */
+    /** Values of the custom fields, validated against CustomFieldDefinition. */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['company:read', 'company:write'])]
     private ?array $customData = null;

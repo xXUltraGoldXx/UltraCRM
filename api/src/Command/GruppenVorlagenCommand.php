@@ -12,10 +12,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Traegt die Standardvorlagen bei Mandanten nach, die es schon vor A14 gab.
+ * Backfills the default permission-group templates for tenants that
+ * already existed before templates were introduced.
  *
- * Neue Mandanten bekommen sie automatisch (TenantStandardgruppenListener) —
- * bestehende brauchen diesen einen Aufruf. Mehrfach ausfuehrbar.
+ * New tenants get them automatically (see TenantStandardgruppenListener);
+ * existing ones need this one-time run. Safe to run multiple times.
  */
 #[AsCommand(
     name: 'app:gruppen:vorlagen',
@@ -34,8 +35,8 @@ final class GruppenVorlagenCommand extends Command
     {
         $stil = new SymfonyStyle($input, $output);
 
-        // Der Befehl laeuft ohne angemeldeten Benutzer; der Mandantenfilter
-        // stuende sonst auf "zu" und faende keinen einzigen Mandanten.
+        // This command runs without a logged-in user; the tenant filter
+        // would otherwise default to closed and find no tenants at all.
         if ($this->em->getFilters()->isEnabled('tenant_filter')) {
             $this->em->getFilters()->disable('tenant_filter');
         }

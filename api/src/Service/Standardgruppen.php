@@ -8,25 +8,26 @@ use App\Security\Permissions;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Die Vorlagen, mit denen ein Mandant startet.
+ * The templates a tenant starts out with.
  *
- * Alexanders Aufzaehlung (24.08.): "Nur lese zugriff. Nur updaten. Anlegen
- * aber nicht löschen. Dann voll zugriff kein admin. Und dann der admin
- * konto." Daraus vier Gruppen — das Admin-Konto ist keine Gruppe, sondern
- * eine Rolle und bleibt davon unberuehrt.
+ * Four levels were requested: read-only access, update-only, create but
+ * not delete, and full access without admin rights — plus the separate
+ * admin account itself. That gives four groups; the admin account is not
+ * a group but a role, and stays unaffected by this.
  *
- * Ausdruecklich VORLAGEN, keine festen Rollen: Alexander will Gruppen frei
- * benennen ("Praktikant") und je Bereich einstellen. Diese vier sind nur da,
- * damit niemand vor einer leeren Liste sitzt — sie lassen sich umbenennen,
- * aendern und loeschen wie jede selbst angelegte Gruppe.
+ * Explicitly TEMPLATES, not fixed roles: groups can be freely renamed
+ * (e.g. "Intern") and configured per area. These four only exist so
+ * nobody starts out with an empty list — they can be renamed, changed,
+ * and deleted just like any group created from scratch.
  *
- * "Loeschen" im Bereich Datenschutz vergibt KEINE Vorlage: dahinter steht
- * die endgueltige Loeschung eines Menschen nach Art. 17 (Alexander:
- * "einstellbar die Berechtigung und ja erstmal nur admin").
+ * "Delete" in the privacy area is deliberately not part of any template:
+ * it stands for the permanent deletion of a person under GDPR Art. 17,
+ * which is meant to stay an admin-only permission for now, configurable
+ * later if needed.
  */
 final class Standardgruppen
 {
-    /** Bereiche des Tagesgeschaefts — ohne Datenschutz und Einrichtung. */
+    /** Day-to-day operational areas — excluding privacy and setup. */
     private const ALLTAG = ['contacts', 'deals', 'activities'];
 
     public function __construct(private readonly EntityManagerInterface $em)
@@ -34,11 +35,11 @@ final class Standardgruppen
     }
 
     /**
-     * Legt fehlende Vorlagen an. Mehrfach aufrufbar: was es schon gibt
-     * (am Namen erkannt), bleibt unangetastet — auch wenn jemand die Rechte
-     * inzwischen geaendert hat.
+     * Creates missing templates. Safe to call multiple times: whatever
+     * already exists (recognized by name) is left untouched — even if
+     * someone has since changed its permissions.
      *
-     * @return list<string> Namen der neu angelegten Gruppen
+     * @return list<string> Names of the newly created groups
      */
     public function anlegen(Tenant $mandant): array
     {
@@ -74,13 +75,14 @@ final class Standardgruppen
     }
 
     /**
-     * Die Alltagsbereiche mit denselben Stufen, dazu Auswertung lesen.
+     * The day-to-day areas with the same levels, plus read access to
+     * reports.
      *
-     * "Lesen und Aendern" und "Anlegen, nicht loeschen" sind technisch
-     * gleich: Anlegen und Aendern ist im System dieselbe Stufe (schreiben).
-     * Beide Vorlagen bleiben trotzdem stehen, weil Alexander sie getrennt
-     * benannt hat und weil ihr Unterschied im Alltag der ist, was NICHT
-     * dabei ist — naemlich Loeschen.
+     * "Lesen und Ändern" ("read and update") and "Anlegen, nicht löschen"
+     * ("create, not delete") are technically identical: creating and
+     * updating are the same level in the system (write). Both templates
+     * are kept as separate options anyway, named for what matters day to
+     * day: what is NOT included, namely deleting.
      *
      * @return array<string, array<string, bool>>
      */
@@ -99,8 +101,8 @@ final class Standardgruppen
     }
 
     /**
-     * Alles, was ohne Adminrechte vergeben werden kann — einschliesslich
-     * Loeschen im Tagesgeschaeft, aber ohne Datenschutz-Loeschung.
+     * Everything that can be granted without admin rights — including
+     * delete in day-to-day operations, but not privacy deletion.
      *
      * @return array<string, array<string, bool>>
      */

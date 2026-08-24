@@ -3,10 +3,10 @@
 namespace App\Entity;
 
 /**
- * Markiert Entities, deren Daten einem Mandanten gehoeren. Der Doctrine-
- * Filter tenant_filter haengt an ALLE Abfragen solcher Entities automatisch
- * die Mandanten-Bedingung an — Isolation haengt damit nicht an von Hand
- * geschriebenen WHERE-Klauseln.
+ * Marks entities whose data belongs to a tenant. The Doctrine filter
+ * tenant_filter automatically appends the tenant condition to ALL queries
+ * against such entities — isolation therefore does not depend on
+ * hand-written WHERE clauses.
  */
 interface TenantOwnedInterface
 {

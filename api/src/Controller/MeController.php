@@ -28,25 +28,25 @@ class MeController extends AbstractController
             'email' => $user->getEmail(),
             'roles' => $user->getRoles(),
             'permissions' => $user->getPermissions(),
-            // Modul #9 Urlaubsverwaltung: Urlaubskonto-Anzeige in UrlaubView.vue
-            // braucht das eigene Jahreskontingent, ohne einen Extra-Request ans
-            // (ROLE_ADMIN-only) /users-Endpunkt zu benoetigen.
+            // Vacation management: the vacation balance display needs the
+            // user's own yearly allowance without an extra request to the
+            // (ROLE_ADMIN-only) /users endpoint.
             'vacationDaysPerYear' => $user->getVacationDaysPerYear(),
         ]);
     }
 
     /**
-     * Passwort-Selbstbedienung (Paket 1, Punkt 3). Bewusst ein eigener, simpler
-     * Endpunkt statt ueber den API-Platform-Patch-Weg (UserPasswordProcessor):
-     * hier MUSS das aktuelle Passwort gegengeprueft werden, das ist kein
-     * generisches Feld-Update.
+     * Self-service password change. Deliberately its own, simple endpoint
+     * rather than going through the API Platform PATCH path
+     * (UserPasswordProcessor): here the current password MUST be
+     * verified first, which is not a generic field update.
      *
-     * JWT-Einschraenkung (bewusst akzeptiert, siehe Auftrag): LexikJWT ist
-     * stateless -- ein bereits ausgestelltes Token bleibt bis zum Ablauf
-     * (token_ttl, hier nicht ueberschrieben, Bundle-Default 3600s/1h) gueltig,
-     * auch nach einem Passwortwechsel. KEINE token_version-Mechanik wie beim
-     * Trading-Bot nachgebaut -- fuer dieses interne Portal mit Ein-Stunden-TTL
-     * bewusst als ausreichend akzeptiert, kein Session-Invalidierungs-Bedarf.
+     * Accepted JWT limitation: LexikJWT is stateless — a token already
+     * issued stays valid until it expires (token_ttl, not overridden
+     * here, bundle default 3600s/1h), even after a password change. No
+     * token-version invalidation mechanism is built for this; for this
+     * internal portal with a one-hour TTL that is accepted as sufficient,
+     * with no need for session invalidation.
      */
     #[Route('/api/me/password', name: 'api_me_password', methods: ['POST'])]
     public function changePassword(Request $request, UserPasswordHasherInterface $passwordHasher, EntityManagerInterface $em): JsonResponse
@@ -62,9 +62,10 @@ class MeController extends AbstractController
             throw new BadRequestHttpException('Aktuelles und neues Passwort sind erforderlich.');
         }
 
-        // Frischer Hash-Vergleich gegen die DB (nicht gegen ein evtl. im Token
-        // mitgefuehrtes altes Passwort) -- kein Detail-Leak, dieselbe generische
-        // Meldung fuer "falsches Passwort" wie fuer jeden anderen Ablehnungsgrund.
+        // Fresh hash comparison against the database (not against an old
+        // password possibly carried in the token) — no detail leak, the
+        // same generic message for "wrong password" as for any other
+        // rejection reason.
         if (!$passwordHasher->isPasswordValid($user, $currentPassword)) {
             throw new AccessDeniedHttpException('Aktuelles Passwort ist falsch.');
         }

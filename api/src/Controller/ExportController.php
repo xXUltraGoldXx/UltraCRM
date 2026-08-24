@@ -19,19 +19,19 @@ use Symfony\Component\HttpKernel\Attribute\IsGranted;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Datenexport (Kontakte, Firmen, Vorgaenge) als CSV oder XLSX.
+ * Data export (contacts, companies, deals) as CSV or XLSX.
  *
- * WICHTIG (DSGVO): Ein Export verlaesst den Mandantenbereich der Anwendung —
- * die erzeugte Datei liegt danach auf dem Rechner des Benutzers und kann von
- * dort weitergegeben werden. Fuer Speicherort, Weitergabe und Loeschung der
- * exportierten Datei ist ab dem Download der Benutzer verantwortlich, nicht
- * mehr die Anwendung.
+ * IMPORTANT (GDPR): an export leaves the application's tenant boundary —
+ * the generated file then lives on the user's machine and can be passed
+ * on from there. From the moment of download, the user is responsible
+ * for where the exported file is stored, shared and deleted, not the
+ * application anymore.
  *
- * Der Mandantenfilter (`tenant_filter`) laeuft automatisch ueber den
- * angemeldeten Benutzer (siehe Context.md, Mandanten-Modell) — dieser
- * Controller baut bewusst KEINE eigene tenant-WHERE-Klausel. Ein von Hand
- * ergaenztes WHERE waere eine zweite Quelle der Wahrheit und genau die
- * Falle, vor der die Mandanten-Architektur schuetzen soll.
+ * The tenant filter (`tenant_filter`) applies automatically based on the
+ * logged-in user — this controller deliberately does NOT build its own
+ * tenant WHERE clause. A manually added WHERE would be a second source
+ * of truth, exactly the trap the tenant architecture is meant to guard
+ * against.
  */
 final class ExportController extends AbstractController
 {
@@ -60,8 +60,8 @@ final class ExportController extends AbstractController
     )]
     public function export(string $typ, string $format, Request $request): Response
     {
-        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
-        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        // Class-level attributes are not evaluated here — hence the
+        // explicit check, so the permission actually takes effect.
         $this->denyAccessUnlessGranted('PERM', 'importexport.use');
 
         [$kopf, $zeilen] = match ($typ) {
@@ -86,8 +86,9 @@ final class ExportController extends AbstractController
             ->leftJoin('c.company', 'comp')->addSelect('comp')
             ->orderBy('c.lastName', 'ASC');
 
-        // Aktive Filter der Oberfläche durchreichen, soweit einfach möglich
-        // (siehe TODO.md A11) — keine Nachbildung der vollen API-Filterlogik.
+        // Pass through the frontend's active filters where that is
+        // simple to do — this does not reproduce the full API filter
+        // logic.
         if ($status = $request->query->get('status')) {
             $qb->andWhere('c.status = :status')->setParameter('status', $status);
         }
@@ -104,8 +105,9 @@ final class ExportController extends AbstractController
             $qb->andWhere('c.department LIKE :department')->setParameter('department', '%' . $department . '%');
         }
 
-        // Zusatzfelder hinten anhaengen — sonst fehlt im Export genau das,
-        // wofuer sie angelegt wurden. Reihenfolge wie in der Verwaltung.
+        // Append custom fields at the end — otherwise the export would
+        // miss the exact thing they were created for. Same order as in
+        // the admin UI.
         $zusatz = $this->customFields->definitionen('contact', $this->mandantDesBenutzers());
 
         $kopf = [
@@ -192,11 +194,11 @@ final class ExportController extends AbstractController
             ->orderBy('d.createdAt', 'DESC');
 
         if ($stage = $request->query->get('stage')) {
-            // Gefiltert wird ueber die Id der Phase, nicht mehr ueber einen
-            // festen Schluessel wie frueher ("gewonnen"). Ein alter Aufruf
-            // wuerde durch (int) still zu 0 und lieferte eine leere, aber
-            // fehlerfrei aussehende Datei — bei einem Export ist ein stilles
-            // Falschergebnis schlimmer als ein Fehler.
+            // Filtered by the stage's id, no longer by a fixed key like
+            // "gewonnen" as before. An old-style call would silently
+            // become 0 via (int) and produce an empty but error-free-
+            // looking file — for an export, a silent wrong result is
+            // worse than an error.
             if (!ctype_digit((string) $stage)) {
                 throw new BadRequestHttpException(
                     'Der Filter "stage" erwartet die Id einer Phase.'
@@ -239,10 +241,11 @@ final class ExportController extends AbstractController
     }
 
     /**
-     * CSV mit UTF-8-BOM und Semikolon als Trennzeichen — ohne beides zerlegt
-     * Excel im deutschsprachigen Raum die Datei falsch (Umlaute bzw. Spalten).
-     * `fputcsv` maskiert Werte mit Semikolon/Anführungszeichen/Zeilenumbruch
-     * automatisch, solange Trenn- und Maskierzeichen explizit gesetzt sind.
+     * CSV with a UTF-8 BOM and semicolon as the delimiter — without both,
+     * Excel in German-speaking locales misreads the file (umlauts or
+     * columns, respectively). `fputcsv` escapes values containing a
+     * semicolon, quote, or line break automatically, as long as the
+     * delimiter and enclosure characters are set explicitly.
      *
      * @param string[] $kopf
      * @param array<int, array<int, string|null>> $zeilen
@@ -266,8 +269,8 @@ final class ExportController extends AbstractController
     }
 
     /**
-     * XLSX ueber phpoffice/phpspreadsheet: fette Kopfzeile, automatische
-     * Spaltenbreite.
+     * XLSX via phpoffice/phpspreadsheet: bold header row, automatic
+     * column width.
      *
      * @param string[] $kopf
      * @param array<int, array<int, string|null>> $zeilen
@@ -299,7 +302,7 @@ final class ExportController extends AbstractController
         return $antwort;
     }
 
-    /** Mandant des angemeldeten Benutzers — Grundlage der Feld-Definitionen. */
+    /** Tenant of the logged-in user — basis for the field definitions. */
     private function mandantDesBenutzers(): ?\App\Entity\Tenant
     {
         $benutzer = $this->getUser();
@@ -307,7 +310,7 @@ final class ExportController extends AbstractController
         return $benutzer instanceof \App\Entity\User ? $benutzer->getTenant() : null;
     }
 
-    /** Zusatzwert lesbar machen: Ja/Nein statt true/false, leer statt null. */
+    /** Make a custom value readable: Ja/Nein instead of true/false, empty instead of null. */
     private function zusatzwert(?array $daten, \App\Entity\CustomFieldDefinition $feld): ?string
     {
         $wert = $daten[$feld->getFieldKey()] ?? null;

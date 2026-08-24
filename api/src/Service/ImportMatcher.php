@@ -7,25 +7,25 @@ use App\Entity\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Sucht zu einer Importzeile bereits vorhandene Kontakte.
+ * Looks up contacts that may already exist for an import row.
  *
- * Bisher hat der Import stillschweigend uebersprungen, was per E-Mail schon
- * existierte — der Datensatz aus der Datei war damit verloren, obwohl er oft
- * neuere Angaben enthaelt (Alexander, 24.08.: "da muss dann beim import
- * kommen wo möglich Kunde existiert schon ergänzen/updaten? Oder auswahl
- * ist neu kunde anlegen").
+ * Previously, the import silently skipped anything that already existed
+ * by email — the row from the file was then lost, even though it often
+ * contained newer data. The import needs to offer a choice instead:
+ * update the existing contact where a match is found, or explicitly
+ * create a new one.
  *
- * Die Stufen entsprechen denen von DuplicateFinder, damit "Dublette" im
- * ganzen System dasselbe bedeutet:
- * - sicher:   gleiche E-Mail (Gross-/Kleinschreibung egal)
- * - moeglich: gleicher Name in derselben Firma
- * - moeglich: gleicher Name, beide ohne Firma
+ * The levels match DuplicateFinder's, so "duplicate" means the same thing
+ * throughout the system:
+ * - confirmed: same email (case-insensitive)
+ * - possible:  same name at the same company
+ * - possible:  same name, both without a company
  *
- * Die letzte Stufe fuehrt DuplicateFinder bewusst NICHT (dort waeren
- * gleichnamige Personen ohne Firmenbezug fast nur Fehltreffer, siehe
- * Analyse.md C20). Beim Import ist die Lage anders: hier entscheidet ein
- * Mensch Zeile fuer Zeile, bevor etwas passiert — ein Hinweis zu viel kostet
- * einen Blick, ein Hinweis zu wenig erzeugt einen doppelten Datensatz.
+ * DuplicateFinder deliberately does NOT run that last level (there,
+ * same-named people with no company would be almost all false
+ * positives). During import the situation is different: a human decides
+ * row by row before anything happens — one hint too many just costs a
+ * glance, one hint too few creates a duplicate record.
  */
 final class ImportMatcher
 {
@@ -43,8 +43,8 @@ final class ImportMatcher
     }
 
     /**
-     * Laedt den Bestand einmal je Import — nicht je Zeile. Bei 500 Zeilen
-     * waeren das sonst 500 Abfragen.
+     * Loads the existing contacts once per import — not once per row.
+     * With 500 rows that would otherwise mean 500 queries.
      */
     public function vorbereiten(?Tenant $tenant): void
     {
@@ -53,12 +53,12 @@ final class ImportMatcher
     }
 
     /**
-     * Nimmt einen frisch aus der Zeile gebauten Kontakt entgegen und liefert
-     * passende Bestandskontakte, beste Uebereinstimmung zuerst.
+     * Takes a contact freshly built from the row and returns matching
+     * existing contacts, best match first.
      *
-     * @param string|null $firmenName Firma aus der Datei — die Firma ist zu
-     *        diesem Zeitpunkt noch nicht angelegt, deshalb der Name statt
-     *        eines Objekts.
+     * @param string|null $firmenName Company name from the file — the
+     *        company doesn't exist as an entity yet at this point, hence
+     *        a name instead of an object.
      *
      * @return list<array{kontakt: Contact, sicherheit: string, grund: string}>
      */
@@ -114,20 +114,20 @@ final class ImportMatcher
             }
         }
 
-        // Sichere Treffer zuerst: die Oberflaeche zeigt den ersten als
-        // Vorschlag an, und "gleiche E-Mail" ist der belastbarste Hinweis.
+        // Confirmed matches first: the UI shows the first one as its
+        // suggestion, and "same email" is the most reliable signal.
         return array_merge($sicher, $moeglich);
     }
 
     /**
-     * Merkt sich eine bereits geprüfte Zeile derselben Datei.
+     * Remembers a row from the same file that has already been checked.
      *
-     * Ohne das faende eine Datei, die denselben Menschen zweimal enthaelt
-     * (in Exportlisten haeufig), keinen Treffer — die Vorschau schluege bei
-     * beiden Zeilen "neu" vor und der Import legte zwei Kontakte an. Vor
-     * dem Vorschau-Schritt hat das die E-Mail-Sperre in execute() verhindert;
-     * mit ausdruecklichen Entscheidungen faellt die weg, also muss die
-     * Doppelung hier auffallen.
+     * Without this, a file containing the same person twice (common in
+     * exported lists) would find no match — the preview would suggest
+     * "new" for both rows and the import would create two contacts.
+     * Before the preview step existed, the email uniqueness constraint in
+     * execute() prevented this; with explicit per-row decisions that
+     * safety net is gone, so the duplicate has to be caught here instead.
      */
     public function merken(int $zeilennummer, Contact $kontakt, ?string $firmenName): void
     {
@@ -135,8 +135,8 @@ final class ImportMatcher
     }
 
     /**
-     * Zeilennummer einer frueheren Zeile derselben Datei, die denselben
-     * Menschen meint — oder null.
+     * Row number of an earlier row in the same file referring to the
+     * same person — or null.
      */
     public function dateiDublette(Contact $neu, ?string $firmenName): ?int
     {

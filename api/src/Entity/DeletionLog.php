@@ -8,22 +8,22 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
- * Nachweis einer Loeschung.
+ * Proof that a deletion happened.
  *
- * Enthaelt BEWUSST keine Personendaten des geloeschten Kontakts — sonst
- * waere die Loeschung keine. Festgehalten wird nur, DASS geloescht wurde:
- * Zeitpunkt, ausfuehrender Benutzer, Grund und ein Pseudonym des
- * Datensatzes (Hash aus Id und Mandant), damit sich eine Anfrage spaeter
- * zuordnen laesst, ohne die Daten wiederherstellen zu koennen.
+ * DELIBERATELY contains no personal data of the deleted contact —
+ * otherwise the deletion would not really be one. Only the fact THAT
+ * something was deleted is recorded: timestamp, acting user, reason, and
+ * a pseudonym of the record (hash of id and tenant), so a later request
+ * can be matched up without being able to restore the data.
  *
- * Nur lesbar — ein Protokoll, das man aendern kann, belegt nichts.
+ * Read-only — a log that can be altered proves nothing.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'deletion_log')]
 #[ApiResource(
-    // Das Loeschprotokoll ist ein Datenschutz-Nachweis und nennt Grund und
-    // ausfuehrende Person. Es gehoert an dasselbe Recht wie das
-    // Aenderungsprotokoll — nicht an "irgendwie angemeldet" (Analyse.md C40).
+    // The deletion log is a compliance record and names the reason and the
+    // acting person. It must sit behind the same permission as the change
+    // log — not merely "logged in somehow".
     operations: [new GetCollection(security: "is_granted('PERM', 'privacy.view')")],
     normalizationContext: ['groups' => ['deletion:read']],
     order: ['deletedAt' => 'DESC'],
@@ -38,12 +38,12 @@ class DeletionLog implements TenantOwnedInterface
     #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
     private ?Tenant $tenant = null;
 
-    /** Was geloescht wurde, z.B. "contact". */
+    /** What was deleted, e.g. "contact". */
     #[ORM\Column(length: 40)]
     #[Groups(['deletion:read'])]
     private string $subjectType;
 
-    /** Pseudonym statt Klarname oder Id-Verweis. */
+    /** Pseudonym instead of a real name or id reference. */
     #[ORM\Column(length: 64)]
     #[Groups(['deletion:read'])]
     private string $subjectRef;
@@ -56,7 +56,7 @@ class DeletionLog implements TenantOwnedInterface
     #[Groups(['deletion:read'])]
     private ?string $deletedBy = null;
 
-    /** Wie viele abhaengige Datensaetze mitgeloescht wurden. */
+    /** How many dependent records were deleted along with it. */
     #[ORM\Column]
     #[Groups(['deletion:read'])]
     private int $relatedCount = 0;

@@ -8,7 +8,7 @@ use App\Entity\Stage;
 use App\Service\MandantReferenz;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
-/** Eine Phase darf nur in einer Pipeline des eigenen Mandanten liegen. */
+/** A stage may only belong to a pipeline of its own tenant. */
 final class StageProcessor implements ProcessorInterface
 {
     public function __construct(

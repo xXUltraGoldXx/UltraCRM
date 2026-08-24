@@ -19,13 +19,13 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Aktivitaet: was mit einem Kontakt passiert ist oder passieren soll.
+ * Activity: something that happened with a contact, or is planned to.
  *
- * Zwei Naturen in einer Entity, bewusst nicht getrennt:
- * - Vergangenes (Anruf, Notiz, E-Mail) -> Verlauf
- * - Vorgemerktes (Aufgabe mit dueAt)   -> Wiedervorlage
- * Getrennte Entities haetten dieselben Felder und denselben Bezug; der
- * Unterschied ist nur, ob ein Faelligkeitsdatum gesetzt ist.
+ * Two natures in one entity, deliberately not split:
+ * - Past (call, note, email) -> history entry
+ * - Planned (task with dueAt) -> follow-up
+ * Separate entities would have the same fields and the same relation;
+ * the only difference is whether a due date is set.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'activity')]
@@ -74,7 +74,7 @@ class Activity implements TenantOwnedInterface
     #[Groups(['activity:read', 'activity:write'])]
     private ?string $body = null;
 
-    /** Gesetzt = Wiedervorlage, leer = reiner Verlaufseintrag. */
+    /** Set = follow-up, empty = plain history entry. */
     #[ORM\Column(nullable: true)]
     #[Groups(['activity:read', 'activity:write'])]
     private ?\DateTimeImmutable $dueAt = null;
@@ -111,7 +111,7 @@ class Activity implements TenantOwnedInterface
         $this->createdAt = new \DateTimeImmutable();
     }
 
-    /** Faellig und noch offen — die Grundlage fuer "Heute fällig". */
+    /** Due and not yet done — the basis for "due today". */
     #[Groups(['activity:read'])]
     public function isOverdue(): bool
     {
@@ -136,7 +136,7 @@ class Activity implements TenantOwnedInterface
     public function setDone(bool $v): static
     {
         $this->done = $v;
-        // Erledigt-Zeitpunkt mitfuehren, ohne dass der Client ihn schickt.
+        // Track the completion timestamp without requiring the client to send it.
         $this->doneAt = $v ? ($this->doneAt ?? new \DateTimeImmutable()) : null;
 
         return $this;

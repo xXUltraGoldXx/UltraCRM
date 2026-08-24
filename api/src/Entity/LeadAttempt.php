@@ -5,12 +5,13 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * Zaehlt Einsendeversuche fuer das Rate-Limit.
+ * Counts submission attempts for the rate limit.
  *
- * Gespeichert wird NUR ein Hash der IP (mit APP_SECRET als Pepper), nie die
- * Adresse selbst: fuer die Missbrauchsabwehr genuegt Wiedererkennung, und
- * ein Klartext-Protokoll waere bei einem CRM mit DSGVO-Anspruch das falsche
- * Signal. Bewusst keine ApiResource — diese Daten gehoeren niemandem.
+ * Only a hash of the IP is stored (with APP_SECRET as pepper), never the
+ * address itself: recognizing repeat attempts is enough for abuse
+ * prevention, and a plaintext log would send the wrong signal for a CRM
+ * with GDPR obligations. Deliberately no ApiResource — this data is not
+ * meant to be exposed to anyone.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'lead_attempt')]

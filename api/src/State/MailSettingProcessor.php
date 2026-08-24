@@ -28,8 +28,8 @@ final class MailSettingProcessor implements ProcessorInterface
     {
         if ($data instanceof MailSetting) {
             $klartext = $data->getPlainSecret();
-            // Leeres Feld laesst das bestehende Passwort unangetastet — sonst
-            // wuerde das Speichern der uebrigen Felder es loeschen.
+            // An empty field leaves the existing password untouched —
+            // otherwise saving the other fields would wipe it.
             if ($klartext !== null && $klartext !== '') {
                 $data->setSecret($this->secretBox->encrypt($klartext));
                 $data->setPlainSecret(null);

@@ -18,12 +18,12 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Dubletten anzeigen und zusammenfuehren.
+ * Displays and merges duplicate contacts.
  *
- * Zusammenfuehren ist unumkehrbar, deshalb entscheidet immer ein Mensch,
- * welcher Datensatz bleibt. Automatisch wird nichts verschmolzen — bei
- * "gleicher Name in derselben Firma" waeren Fehlentscheidungen sonst
- * programmiert.
+ * Merging is irreversible, so a human always decides which record
+ * survives. Nothing is merged automatically — with a criterion like
+ * "same name at the same company", wrong decisions would otherwise be
+ * baked in.
  */
 final class DuplicateController extends AbstractController
 {
@@ -42,9 +42,9 @@ final class DuplicateController extends AbstractController
 
         $mandant = $this->mandant();
         if ($mandant === null) {
-            // Ein Superadmin haengt an keinem Mandanten. Ohne diese Sperre
-            // wuerde findBy() ohne Kriterien die Kontakte ALLER Mandanten
-            // laden und sie miteinander als Dublette vorschlagen.
+            // A superadmin belongs to no tenant. Without this guard,
+            // findBy() without criteria would load the contacts of ALL
+            // tenants and suggest them as duplicates of each other.
             return new JsonResponse(
                 ['error' => 'Dubletten koennen nur innerhalb eines Mandanten gesucht werden.'],
                 403
@@ -73,17 +73,19 @@ final class DuplicateController extends AbstractController
     }
 
     /**
-     * Fuehrt zwei Kontakte zusammen: der Zieldatensatz bleibt, der andere
-     * verschwindet. Leere Felder des Ziels werden aus der Quelle gefuellt —
-     * vorhandene NIE ueberschrieben, sonst gehen Korrekturen verloren.
+     * Merges two contacts: the target record survives, the other one
+     * disappears. Empty fields on the target are filled from the source
+     * — existing ones are NEVER overwritten, or corrections would be
+     * lost.
      */
     #[Route('/api/duplicates/merge', name: 'duplicates_merge', methods: ['POST'])]
     public function zusammenfuehren(Request $request): Response
     {
-        // Zusammenfuehren loescht einen Kontakt unwiderruflich. Das reguläre
-        // DELETE auf Contact verlangt ROLE_ADMIN — dieselbe Wirkung muss hier
-        // dieselbe Huerde haben, sonst laeuft der Loeschschutz ins Leere
-        // (Analyse.md C7: Rechte an der Wirkung ausrichten, nicht am Ort).
+        // Merging irreversibly deletes a contact. The regular DELETE on
+        // Contact requires ROLE_ADMIN — the same effect here needs the
+        // same bar, or the delete protection would be pointless: a
+        // permission check must follow the effect of an action, not
+        // where in the code it happens to sit.
         $this->denyAccessUnlessGranted('PERM', 'contacts.manage');
         $this->denyAccessUnlessGranted('PERM', 'contacts.delete');
 
@@ -115,15 +117,15 @@ final class DuplicateController extends AbstractController
             return new JsonResponse(['error' => 'Kontakt nicht gefunden.'], 404);
         }
 
-        // Mandantenzugehoerigkeit ausdruecklich pruefen, nicht nur auf den
-        // Doctrine-Filter vertrauen (Analyse.md C13).
+        // Explicitly check tenant ownership rather than relying solely
+        // on the Doctrine filter.
         if ($ziel->getTenant() !== $mandant || $quelle->getTenant() !== $mandant) {
             return new JsonResponse(['error' => 'Kontakt nicht gefunden.'], 404);
         }
 
-        // Nur zusammenfuehren, was auch als Dublette erkannt wurde. Sonst
-        // waere /api/duplicates/merge ein zweiter Loeschweg fuer beliebige
-        // Kontakte.
+        // Only merge what was actually detected as a duplicate.
+        // Otherwise /api/duplicates/merge would become a second delete
+        // path for arbitrary contacts.
         $sicher = null;
         foreach ($this->finder->finden($mandant) as $g) {
             $ids = array_map(static fn (Contact $k) => $k->getId(), $g['kontakte']);
@@ -145,8 +147,8 @@ final class DuplicateController extends AbstractController
             return new JsonResponse(['error' => $e->getMessage()], 409);
         }
 
-        // Verlauf und Vorgaenge umhaengen statt loeschen — sie gehoeren zur
-        // Geschichte des Kunden.
+        // Reassign history and deals instead of deleting them — they are
+        // part of the customer's history.
         $aktivitaeten = $this->em->getRepository(Activity::class)->findBy(['contact' => $quelle]);
         foreach ($aktivitaeten as $a) {
             $a->setContact($ziel);
@@ -157,9 +159,9 @@ final class DuplicateController extends AbstractController
             $d->setContact($ziel);
         }
 
-        // Protokolleintraege des aufgeloesten Datensatzes entfernen: sie
-        // verweisen auf eine Id, die es gleich nicht mehr gibt, und enthalten
-        // Personendaten (siehe Analyse.md C15).
+        // Remove change-log entries of the dissolved record: they point
+        // to an id that is about to no longer exist, and they contain
+        // personal data.
         foreach ($this->em->getRepository(ChangeLog::class)->findBy(
             ['subjectType' => 'contact', 'subjectId' => $quelle->getId()]
         ) as $c) {

@@ -13,8 +13,8 @@ use Symfony\Component\HttpKernel\Attribute\IsGranted;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Auswertung. Die Abfragen laufen ueber den Mandantenfilter, es kann also
- * niemand versehentlich ueber Mandantengrenzen hinweg summieren.
+ * Reporting. The queries run through the tenant filter, so nobody can
+ * accidentally aggregate across tenant boundaries.
  */
 final class ReportController extends AbstractController
 {
@@ -25,8 +25,8 @@ final class ReportController extends AbstractController
     #[Route('/api/reports/summary', name: 'report_summary', methods: ['GET'])]
     public function summary(): Response
     {
-        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
-        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        // Class-level attributes are not evaluated here — hence the
+        // explicit check, so the permission actually takes effect.
         $this->denyAccessUnlessGranted('PERM', 'reports.view');
 
         /** @var Deal[] $deals */
@@ -34,12 +34,12 @@ final class ReportController extends AbstractController
         /** @var Contact[] $kontakte */
         $kontakte = $this->em->getRepository(Contact::class)->findAll();
 
-        // Funnel: Anzahl und Wert je Phase, in der Reihenfolge der Pipeline.
-        // Die Phasen kommen aus der Datenbank, nicht mehr aus einer
-        // Konstante — jeder Mandant hat seine eigenen.
-        // Nach Pipeline gruppiert, innerhalb der Pipeline nach Position:
-        // sonst mischen sich bei mehreren Pipelines die Phasen mit gleicher
-        // Position ineinander und der Funnel liest sich als Durcheinander.
+        // Funnel: count and value per stage, in pipeline order. The
+        // stages come from the database rather than a constant — each
+        // tenant has their own. Grouped by pipeline, then by position
+        // within the pipeline: otherwise, with several pipelines, stages
+        // sharing the same position would mix together and the funnel
+        // would read as a jumble.
         /** @var Stage[] $phasen */
         $phasen = $this->em->createQuery(
             'SELECT s FROM App\Entity\Stage s JOIN s.pipeline p ORDER BY p.position ASC, p.id ASC, s.position ASC'
@@ -70,7 +70,7 @@ final class ReportController extends AbstractController
         );
         $abgeschlossen = count($gewonnen) + count($verloren);
 
-        // Herkunft der Kontakte — zeigt, welcher Kanal wirklich liefert.
+        // Contact source breakdown — shows which channel actually delivers.
         $quellen = [];
         foreach ($kontakte as $k) {
             $quellen[$k->getSource()] = ($quellen[$k->getSource()] ?? 0) + 1;
@@ -92,8 +92,8 @@ final class ReportController extends AbstractController
                 'offeneVorgaenge' => count($offen),
                 'offenerWert' => array_sum(array_map(static fn (Deal $d) => (float) $d->getValue(), $offen)),
                 'gewonnenerWert' => array_sum(array_map(static fn (Deal $d) => (float) $d->getValue(), $gewonnen)),
-                // Quote nur ausweisen, wenn ueberhaupt etwas abgeschlossen wurde —
-                // "0 %" bei null Abschluessen waere eine falsche Aussage.
+                // Only report a rate if anything was closed at all —
+                // "0%" with zero closed deals would be a false statement.
                 'abschlussquote' => $abgeschlossen > 0
                     ? round(count($gewonnen) / $abgeschlossen * 100, 1)
                     : null,

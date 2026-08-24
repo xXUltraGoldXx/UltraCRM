@@ -6,38 +6,38 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
- * Liest Import-Dateien (CSV/XLSX) und schlaegt eine Feldzuordnung vor.
+ * Reads import files (CSV/XLSX) and suggests a field mapping.
  *
- * Die API ist zustandslos (siehe TODO.md A11): der Import laeuft in vier
- * Schritten, aber es gibt keinen Server-Zwischenspeicher — Kopfzeile und
- * Zuordnung wandern als Antwort zum Client und kommen beim Ausfuehren
- * zusammen mit der (ggf. korrigierten) Zuordnung wieder zurueck.
+ * The API is stateless: the import runs in four steps, but there is no
+ * server-side cache — the header row and the mapping travel to the client
+ * as part of the response, and come back together with the (possibly
+ * corrected) mapping when the import is executed.
  */
 final class ImportAnalyzer
 {
-    /** Obergrenzen aus TODO.md A11 (Risiko "grosse Dateien"). */
+    /** Upper limits to guard against oversized import files. */
     public const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
     public const MAX_ROWS = 5000;
 
-    /** Anzahl Vorschauzeilen fuer Schritt 1 (Kopfzeile + Zuordnungsvorschlag). */
+    /** Number of preview rows for step 1 (header + suggested mapping). */
     private const PREVIEW_ROWS = 5;
 
-    /** Ziel-Felder im CRM, auf die eine Spalte abgebildet werden kann. */
+    /** Target fields in the CRM that a column can be mapped to. */
     public const TARGET_FIELDS = ['firstName', 'lastName', 'email', 'phone', 'company', 'position', 'department'];
 
-    /** Kein Zielfeld — Spalte wird beim Import nicht uebernommen. */
+    /** Not a target field — the column is skipped during import. */
     public const IGNORE = 'ignore';
 
     /**
-     * Synonyme, die nur exakt treffen duerfen. Als Teilstring wuerden sie
-     * mehr kaputt machen als helfen ("name" in "Firmenname").
+     * Synonyms that may only match exactly. As a substring they would
+     * cause more harm than good (e.g. "name" inside "Firmenname").
      */
     private const ZU_ALLGEMEIN = ['name', 'titel', 'title', 'rolle', 'mail', 'tel'];
 
     /**
-     * Synonyme je Zielfeld (Rohschreibweisen, wie sie in fremden CRM-Exporten
-     * vorkommen). Der Vergleich normalisiert beide Seiten (siehe normalize()):
-     * klein geschrieben, ohne Sonderzeichen/Leerzeichen.
+     * Synonyms per target field (raw spellings as they appear in exports
+     * from other CRMs). The comparison normalizes both sides (see
+     * normalize()): lowercased, without special characters or spaces.
      */
     private const SYNONYMS = [
         'firstName' => ['vorname', 'first name', 'firstname', 'given name', 'rufname'],
@@ -53,10 +53,10 @@ final class ImportAnalyzer
     ];
 
     /**
-     * Liest die gesamte Datei (fuer Schritt 1 Vorschau und Schritt 3/4
-     * Uebernahme dieselbe Grundlage). Wirft eine \RuntimeException mit
-     * deutscher Meldung, wenn Groesse oder Zeilenzahl die Obergrenze
-     * ueberschreiten oder die Datei nicht lesbar ist.
+     * Reads the whole file (used as the same basis for both the step 1
+     * preview and the step 3/4 import). Throws a \RuntimeException with a
+     * German message if the size or row count exceeds the limit, or if
+     * the file can't be read.
      *
      * @return array{headers: string[], rows: array<int, array<int, string>>}
      */
@@ -83,8 +83,8 @@ final class ImportAnalyzer
     }
 
     /**
-     * Vorschau fuer Schritt 1: Kopfzeile, die ersten Datenzeilen und ein
-     * Zuordnungsvorschlag je Spalte.
+     * Preview for step 1: header row, the first data rows, and a
+     * suggested mapping per column.
      */
     public function analyze(UploadedFile $file, array $zusatzfelder = []): array
     {
@@ -99,18 +99,17 @@ final class ImportAnalyzer
     }
 
     /**
-     * Schlaegt fuer jede Spalte ein Zielfeld vor, indem die Ueberschrift
-     * normalisiert gegen die Synonymtabelle verglichen wird. Unbekannte
-     * Spalten bekommen den Vorschlag "ignorieren".
+     * Suggests a target field for each column by comparing the
+     * normalized header against the synonym table. Unknown columns get
+     * the "ignore" suggestion.
      *
      * @param string[] $headers
      * @return array<int, string>
      */
     public function suggestMapping(array $headers, array $zusatzfelder = []): array
     {
-        // Kein static-Cache mehr: die Zusatzfelder unterscheiden sich je
-        // Mandant, ein einmal aufgebautes Verzeichnis waere fuer den
-        // naechsten Mandanten falsch.
+        // No static cache anymore: custom fields differ per tenant, so a
+        // lookup table built once would be wrong for the next tenant.
         $lookup = null;
         if ($lookup === null) {
             $lookup = [];
@@ -118,12 +117,12 @@ final class ImportAnalyzer
                 foreach ($synonyme as $synonym) {
                     $lookup[$this->normalize($synonym)] = $feld;
                 }
-                // Das Zielfeld selbst (z.B. "firstName") ebenfalls erkennen.
+                // Also recognize the target field name itself (e.g. "firstName").
                 $lookup[$this->normalize($feld)] = $feld;
             }
 
-            // Selbst angelegte Felder: Bezeichnung UND Schluessel erkennen,
-            // damit eine Spalte "Kundennummer" ebenso trifft wie "kundennummer".
+            // Custom fields: recognize both the label AND the key, so a
+            // column "Kundennummer" matches just as well as "kundennummer".
             foreach ($zusatzfelder as $zf) {
                 $lookup[$this->normalize($zf->getLabel())] = 'custom.' . $zf->getFieldKey();
                 $lookup[$this->normalize($zf->getFieldKey())] = 'custom.' . $zf->getFieldKey();
@@ -137,18 +136,19 @@ final class ImportAnalyzer
                     return $lookup[$norm];
                 }
 
-                // Zweiter Versuch: Spaltennamen aus Fremdsystemen sind oft
-                // zusammengesetzt ("Kontakt-Mail-Adresse", "Firmenname").
-                // Deshalb zusaetzlich prüfen, ob ein bekanntes Synonym im
-                // Namen steckt — laengste Treffer zuerst, damit "mail" nicht
-                // gewinnt, wo "emailadresse" passt.
+                // Second attempt: column names from other systems are
+                // often compound ("Kontakt-Mail-Adresse", "Firmenname").
+                // So also check whether a known synonym is contained in
+                // the name — longest match first, so "mail" doesn't win
+                // where "emailadresse" fits.
                 $kandidaten = array_keys($lookup);
                 usort($kandidaten, static fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
                 foreach ($kandidaten as $kandidat) {
-                    // Zu allgemeine Woerter taugen nicht als Teilstring:
-                    // "name" steckt auch in "Firmenname" und haette es
-                    // faelschlich zum Nachnamen gemacht (im Test passiert).
-                    // Eine falsche Zuordnung ist schlimmer als gar keine.
+                    // Overly generic words don't work as a substring
+                    // match: "name" is also contained in "Firmenname" and
+                    // would incorrectly map it to last name (this
+                    // happened in a test). A wrong mapping is worse than
+                    // none at all.
                     if (in_array($kandidat, self::ZU_ALLGEMEIN, true)) {
                         continue;
                     }
@@ -165,10 +165,10 @@ final class ImportAnalyzer
     }
 
     /**
-     * Vergleichbar machen: klein schreiben, deutsche Umlaute transliterieren,
-     * alles ausser Buchstaben/Ziffern entfernen. So matchen "E-Mail",
-     * "email" und "E-Mail-Adresse" auf denselben Schluessel — case-insensitiv
-     * und ohne Sonderzeichen/Leerzeichen, wie in TODO.md A11 gefordert.
+     * Makes values comparable: lowercases, transliterates German umlauts,
+     * strips everything except letters and digits. This way "E-Mail",
+     * "email" and "E-Mail-Adresse" all match the same key — case-
+     * insensitive and without special characters or spaces.
      */
     public function normalize(string $value): string
     {
@@ -189,15 +189,15 @@ final class ImportAnalyzer
             throw new \RuntimeException('Die Datei konnte nicht gelesen werden.');
         }
 
-        // BOM entfernen — Excel-Exporte aus dem DACH-Raum schreiben oft eine.
+        // Strip BOM — Excel exports from German-speaking countries often add one.
         $content = (string) preg_replace('/^\xEF\xBB\xBF/', '', $content);
 
         if (trim($content) === '') {
             return [];
         }
 
-        // Trennzeichen erkennen: Semikolon ist in DACH-Exporten ueblich,
-        // andere Systeme liefern Komma oder Tab.
+        // Detect the delimiter: semicolon is common in German-region
+        // exports, other systems produce comma or tab.
         $ersteZeile = strtok($content, "\r\n") ?: '';
         $delimiter = ';';
         $treffer = 0;
@@ -216,7 +216,7 @@ final class ImportAnalyzer
         $rows = [];
         while (($zeile = fgetcsv($handle, 0, $delimiter, '"', '\\')) !== false) {
             if ($zeile === [null]) {
-                continue; // leere Zeile
+                continue;
             }
             $rows[] = array_map(static fn ($v) => $v === null ? '' : (string) $v, $zeile);
         }
@@ -236,7 +236,7 @@ final class ImportAnalyzer
 
         $rows = [];
         foreach ($spreadsheet->getActiveSheet()->toArray(null, true, true, false) as $zeile) {
-            // Komplett leere Zeilen ueberspringen (haeufig am Dateiende).
+            // Skip fully empty rows (common at the end of the file).
             if (count(array_filter($zeile, static fn ($v) => trim((string) $v) !== '')) === 0) {
                 continue;
             }

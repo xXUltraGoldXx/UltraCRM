@@ -10,14 +10,14 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
- * Aenderungsprotokoll: wer hat wann welches Feld wie geaendert.
+ * Change log: who changed which field, how and when.
  *
- * Ergaenzt das Loeschprotokoll (DeletionLog) um den Alltag. Zusammen
- * beantworten sie die Frage, die bei einer Auskunft nach Art. 15 wirklich
- * gestellt wird: "Was wurde mit meinen Daten gemacht?"
+ * Complements the deletion log (DeletionLog) for everyday changes.
+ * Together they answer the question a GDPR Art. 15 access request
+ * actually asks: "What has been done with my data?"
  *
- * Nur lesbar — ein Protokoll, das sich aendern laesst, belegt nichts. Aus
- * demselben Grund gibt es kein Patch und kein Delete.
+ * Read-only — a log that can be altered proves nothing. For the same
+ * reason there is no Patch and no Delete.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'change_log')]
@@ -39,7 +39,7 @@ class ChangeLog implements TenantOwnedInterface
     #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
     private ?Tenant $tenant = null;
 
-    /** z.B. "contact", "company", "deal". */
+    /** e.g. "contact", "company", "deal". */
     #[ORM\Column(length: 40)]
     #[Groups(['changelog:read'])]
     private string $subjectType;
@@ -53,9 +53,9 @@ class ChangeLog implements TenantOwnedInterface
     private string $field;
 
     /**
-     * Alter und neuer Wert als Text. Bewusst gekuerzt: das Protokoll soll
-     * nachvollziehbar machen, WAS sich geaendert hat, nicht eine zweite
-     * Kopie aller Daten anlegen.
+     * Old and new value as text. Deliberately not exhaustive: the log
+     * should make it traceable WHAT changed, not create a second copy of
+     * all the data.
      */
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['changelog:read'])]

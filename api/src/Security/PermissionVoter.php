@@ -8,15 +8,15 @@ use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
- * Macht den Rechtekatalog fuer `is_granted('PERM', 'contacts.view')`
- * verfuegbar — in Controllern wie in den API-Platform-Attributen.
+ * Makes the permission catalog available for `is_granted('PERM',
+ * 'contacts.view')` — in controllers as well as API Platform attributes.
  *
- * Warum ein Voter und kein Ausdruck je Operation: die Regel "manage
- * schliesst view ein" muesste sonst in jedem einzelnen Ausdruck wiederholt
- * werden. Beim ersten Versuch war genau das die Fehlerquelle — ein
- * Mitarbeiter mit `activities.manage` bekam beim Lesen 403, weil der
- * Ausdruck nur auf `activities.view` prueft. Hier gilt die Logik einmal und
- * ist in PermissionsTest abgesichert.
+ * Why a voter instead of an expression per operation: the rule that
+ * "manage implies view" would otherwise have to be repeated in every
+ * single expression. That was the exact source of an earlier bug — a
+ * staff member with `activities.manage` got a 403 on read, because the
+ * expression only checked `activities.view`. Here the logic lives in one
+ * place and is covered by PermissionsTest.
  */
 final class PermissionVoter extends Voter
 {

@@ -13,16 +13,16 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Ein selbst angelegtes Zusatzfeld.
+ * A self-defined custom field.
  *
- * Warum eine Definition und ein JSON-Wert am Datensatz statt echter Spalten:
- * Spalten anzulegen hiesse, dass jeder Mandant das Schema veraendert — bei
- * mehreren Mandanten in einer Datenbank ist das nicht tragbar. Der Preis ist,
- * dass sich nach Zusatzfeldern nur eingeschraenkt filtern laesst; das ist fuer
- * Zusatzangaben vertretbar.
+ * Why a definition plus a JSON value on the record instead of real columns:
+ * adding columns would mean every tenant alters the schema — with multiple
+ * tenants sharing one database, that is not viable. The price is that
+ * filtering by custom fields is only possible to a limited extent; that is
+ * an acceptable trade-off for supplementary data.
  *
- * Die Werte werden serverseitig gegen diese Definition geprueft — ein freies
- * JSON-Feld ohne Pruefung waere eine Einladung fuer Datenmuell.
+ * Values are validated server-side against this definition — an open JSON
+ * field without validation would invite garbage data.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'custom_field_definition')]
@@ -41,7 +41,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 class CustomFieldDefinition implements TenantOwnedInterface
 {
-    /** Fuer welche Art von Datensatz das Feld gilt. */
+    /** Which kind of record this field applies to. */
     public const ENTITIES = ['contact', 'company', 'deal'];
 
     public const TYPES = ['text', 'zahl', 'datum', 'auswahl', 'janein'];
@@ -60,9 +60,8 @@ class CustomFieldDefinition implements TenantOwnedInterface
     private string $entityType = 'contact';
 
     /**
-     * Technischer Schluessel im JSON. Wird aus der Bezeichnung abgeleitet und
-     * danach NICHT mehr geaendert — sonst verlieren bestehende Datensaetze
-     * ihren Wert.
+     * Technical key inside the JSON. Derived from the label and then NEVER
+     * changed afterwards — otherwise existing records lose their value.
      */
     #[ORM\Column(length: 60)]
     #[Assert\NotBlank(message: 'Bitte einen Feldschlüssel angeben.')]
@@ -80,7 +79,7 @@ class CustomFieldDefinition implements TenantOwnedInterface
     #[Groups(['cfd:read', 'cfd:write'])]
     private string $type = 'text';
 
-    /** Nur bei Typ "auswahl": die zulaessigen Werte. */
+    /** Only used when type is "auswahl" (select): the allowed values. */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['cfd:read', 'cfd:write'])]
     private ?array $options = null;

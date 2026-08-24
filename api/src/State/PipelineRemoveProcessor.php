@@ -12,13 +12,13 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 /**
- * Verhindert, dass eine Phase oder Pipeline geloescht wird, an der noch
- * Vorgaenge haengen.
+ * Prevents a stage or pipeline from being deleted while deals still
+ * reference it.
  *
- * Die Fremdschluessel stehen auf RESTRICT, die Daten waren also nie in
- * Gefahr — der Aufrufer bekam aber einen HTTP 500 und keinen Hinweis,
- * was zu tun ist. Hier wird daraus eine Antwort, mit der jemand arbeiten
- * kann: erst die Vorgaenge umhaengen, dann loeschen.
+ * The foreign keys are set to RESTRICT, so the data was never actually
+ * at risk — but the caller got an HTTP 500 with no hint what to do
+ * about it. This turns that into a response people can act on: move
+ * the deals first, then delete.
  */
 final class PipelineRemoveProcessor implements ProcessorInterface
 {
@@ -36,10 +36,10 @@ final class PipelineRemoveProcessor implements ProcessorInterface
         }
 
         if ($data instanceof Pipeline) {
-            // Die letzte Pipeline muss bleiben. Ohne sie hat der Mandant
-            // keine einzige Phase mehr, und da eine Phase am Vorgang Pflicht
-            // ist, liesse sich kein neuer Vorgang mehr anlegen — dasselbe
-            // kaputt wirkende System, das TenantPipelineListener verhindert.
+            // The last pipeline must stay. Without it the tenant would
+            // have no stage at all, and since a deal requires a stage,
+            // no new deal could be created — the same broken-looking
+            // system that TenantPipelineListener prevents.
             $verbleibend = (int) $this->em->getRepository(Pipeline::class)
                 ->count(['tenant' => $data->getTenant()]);
             if ($verbleibend <= 1) {
@@ -48,16 +48,16 @@ final class PipelineRemoveProcessor implements ProcessorInterface
                 );
             }
 
-            // Erst pruefen, ob ueberhaupt geloescht werden darf ...
+            // First check whether deletion is allowed at all ...
             foreach ($data->getStages() as $phase) {
                 $this->pruefePhase($phase, $data->getName());
             }
 
-            // ... dann die Phasen mitnehmen. Der Fremdschluessel steht auf
-            // RESTRICT, ohne diesen Schritt scheitert das Loeschen einer
-            // Pipeline mit Phasen an der Datenbank (HTTP 500) — und die
-            // Oberflaeche sagt dem Anwender ausdruecklich zu, dass die
-            // Phasen mitgehen.
+            // ... then take the stages down with it. The foreign key is
+            // set to RESTRICT, so without this step deleting a pipeline
+            // that still has stages would fail at the database (HTTP
+            // 500) — and the frontend explicitly promises the user that
+            // the stages go with it.
             foreach ($data->getStages() as $phase) {
                 $this->em->remove($phase);
             }

@@ -13,11 +13,11 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Ein einbettbares Lead-Formular.
+ * An embeddable lead form.
  *
- * Der Token bestimmt, bei welchem Mandanten ein Lead landet. Die
- * Mandanten-Id kommt NIE aus dem Request — sonst koennte jeder Leads in
- * fremde Mandanten schreiben.
+ * The token determines which tenant a lead lands in. The tenant id NEVER
+ * comes from the request — otherwise anyone could write leads into a
+ * foreign tenant.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'lead_form')]
@@ -47,7 +47,7 @@ class LeadForm implements TenantOwnedInterface
     #[Groups(['leadform:read', 'leadform:write'])]
     private ?string $name = null;
 
-    /** Zufaellig, nicht erratbar; identifiziert das Formular oeffentlich. */
+    /** Random, not guessable; publicly identifies the form. */
     #[ORM\Column(length: 64, unique: true)]
     #[Groups(['leadform:read'])]
     private string $token;
@@ -57,9 +57,9 @@ class LeadForm implements TenantOwnedInterface
     private bool $active = true;
 
     /**
-     * Wortlaut der Einwilligung, dem der Absender zustimmt. Wird bei jedem
-     * Lead mitgeschrieben — ein spaeter geaenderter Text darf die frueher
-     * erteilte Einwilligung nicht rueckwirkend veraendern.
+     * Wording of the consent the submitter agrees to. Stored with every
+     * lead — a later-changed text must not retroactively alter consent
+     * that was already given.
      */
     #[ORM\Column(type: 'text')]
     #[Assert\NotBlank(message: 'Bitte den Einwilligungstext angeben.')]

@@ -7,11 +7,11 @@ use App\Entity\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Prueft die Werte von Zusatzfeldern gegen ihre Definition.
+ * Validates custom field values against their definitions.
  *
- * Ein JSON-Feld ohne Pruefung nimmt alles an — auch Zahlen im Datumsfeld
- * oder Auswahlwerte, die es gar nicht gibt. Spaetestens beim Auswerten faellt
- * das auf die Fuesse.
+ * An unvalidated JSON field accepts anything — numbers in a date field,
+ * select options that don't even exist. That comes back to bite you at
+ * the latest when the data gets reported on.
  */
 final class CustomFieldValidator
 {
@@ -27,8 +27,8 @@ final class CustomFieldValidator
     }
 
     /**
-     * Prueft und normalisiert. Gibt Fehlermeldungen je Feldschluessel zurueck;
-     * ist die Liste leer, sind die Werte in Ordnung.
+     * Validates and normalizes. Returns error messages per field key; an
+     * empty list means the values are fine.
      *
      * @return array{werte: array<string, mixed>, fehler: array<string, string>}
      */
@@ -87,13 +87,14 @@ final class CustomFieldValidator
                     break;
 
                 default:
-                    // Text: Laenge begrenzen, damit niemand ein Buch ablegt.
+                    // Text: cap the length so nobody stores a novel in it.
                     $sauber[$d->getFieldKey()] = mb_substr((string) $wert, 0, 2000);
             }
         }
 
-        // Werte ohne Definition verschwinden stillschweigend — sie gehoeren
-        // nicht zu diesem Mandanten und haetten sonst keinerlei Bedeutung.
+        // Values without a definition silently disappear — they don't
+        // belong to this tenant and would otherwise have no meaning at
+        // all.
         foreach (array_keys($werte) as $schluessel) {
             if (!in_array($schluessel, $bekannt, true)) {
                 unset($sauber[$schluessel]);

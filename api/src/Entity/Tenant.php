@@ -13,8 +13,8 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Ein Mandant (Firma). Verwaltung ist Superadmin-Sache — Mandanten sehen
- * einander nie.
+ * A tenant (company). Managing tenants is superadmin business — tenants
+ * never see each other.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'tenant')]

@@ -21,23 +21,22 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
- * Kontakt-Import in vier Schritten (siehe TODO.md A11):
- * 1) analyze  — Datei lesen, Kopfzeile + Vorschau + Zuordnungsvorschlag
- * 2) (Frontend) Nutzer prueft/korrigiert die Zuordnung
- * 3) (Frontend) Vorschau der ersten Zeilen mit der gewaehlten Zuordnung
- * 4) execute  — Datei + (ggf. korrigierte) Zuordnung, legt Kontakte an
+ * Contact import in four steps:
+ * 1) analyze  — read the file, header row + preview + mapping suggestion
+ * 2) (frontend) user reviews/corrects the mapping
+ * 3) (frontend) preview of the first rows with the chosen mapping
+ * 4) execute  — file + (possibly corrected) mapping, creates the contacts
  *
- * Die API ist zustandslos: es gibt keinen Server-Zwischenspeicher zwischen
- * Schritt 1 und Schritt 4 — die Datei wird bei /execute erneut mitgeschickt.
+ * The API is stateless: there is no server-side cache between step 1 and
+ * step 4 — the file is sent again with /execute.
  *
- * DSGVO (zwingend, siehe TODO.md A11):
- * - importierte Kontakte bekommen source = 'import' (Herkunft bleibt benennbar)
- * - es wird KEINE Einwilligung gesetzt — der Import darf kein Weg sein, die
- *   Einwilligungspflicht zu umgehen (siehe Kommentar in execute())
+ * GDPR (mandatory):
+ * - imported contacts get source = 'import' (the origin stays traceable)
+ * - NO consent is set — import must not be a way to bypass the consent
+ *   requirement (see the comment in execute())
  *
- * Der Mandant kommt wie ueberall aus dem angemeldeten Benutzer, nie aus dem
- * Request (Context.md, Mandanten-Modell); TenantAssignListener setzt ihn
- * beim Anlegen automatisch.
+ * As everywhere, the tenant comes from the logged-in user, never from
+ * the request; TenantAssignListener sets it automatically on creation.
  */
 final class ImportController extends AbstractController
 {
@@ -51,12 +50,12 @@ final class ImportController extends AbstractController
     ) {
     }
 
-    /** Schritt 1: Datei lesen, Kopfzeile + fuenf Vorschauzeilen + Zuordnungsvorschlag. */
+    /** Step 1: read the file, header row + five preview rows + mapping suggestion. */
     #[Route('/api/import/analyze', name: 'import_analyze', methods: ['POST'])]
     public function analyze(Request $request): Response
     {
-        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
-        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        // Class-level attributes are not evaluated here — hence the
+        // explicit check, so the permission actually takes effect.
         $this->denyAccessUnlessGranted('PERM', 'importexport.use');
 
         $file = $request->files->get('file');
@@ -78,17 +77,17 @@ final class ImportController extends AbstractController
     }
 
     /**
-     * Schritt 4: Uebernahme mit der vom Nutzer geprueften Zuordnung.
+     * Step 4: commit using the mapping the user reviewed.
      *
-     * `mapping` ist ein JSON-Feld im selben multipart/form-data-Request wie
-     * die Datei: ein Array in der Reihenfolge der Kopfzeile aus Schritt 1,
-     * je Eintrag ein Zielfeld (ImportAnalyzer::TARGET_FIELDS) oder "ignore".
+     * `mapping` is a JSON field in the same multipart/form-data request as
+     * the file: an array in the order of the header row from step 1, one
+     * target field per entry (ImportAnalyzer::TARGET_FIELDS) or "ignore".
      */
     #[Route('/api/import/execute', name: 'import_execute', methods: ['POST'])]
     public function execute(Request $request): Response
     {
-        // Klassen-Attribute wurden hier nicht ausgewertet — deshalb
-        // ausdrücklich prüfen, damit die Rechte sicher greifen.
+        // Class-level attributes are not evaluated here — hence the
+        // explicit check, so the permission actually takes effect.
         $this->denyAccessUnlessGranted('PERM', 'importexport.use');
 
         $file = $request->files->get('file');
@@ -112,9 +111,9 @@ final class ImportController extends AbstractController
             return $this->fehler('Die Zuordnung passt nicht mehr zur Datei.', 422);
         }
 
-        // Spaltenindex je Zielfeld ermitteln; zeigen mehrere Spalten auf
-        // dasselbe Feld, gilt die erste — der Rest wurde vom Nutzer
-        // versehentlich doppelt zugeordnet.
+        // Determine the column index per target field; if several columns
+        // point to the same field, the first one wins — the rest were
+        // accidentally mapped twice by the user.
         $indexJeFeld = [];
         $indexJeZusatzfeld = [];
         foreach (array_values($mapping) as $i => $feld) {
@@ -123,7 +122,7 @@ final class ImportController extends AbstractController
                 continue;
             }
 
-            // Selbst angelegte Felder kommen als "custom.<schluessel>".
+            // Custom fields arrive as "custom.<key>".
             if (is_string($feld) && str_starts_with($feld, 'custom.')) {
                 $schluessel = substr($feld, 7);
                 if (!isset($indexJeZusatzfeld[$schluessel])) {
@@ -144,11 +143,11 @@ final class ImportController extends AbstractController
         $benutzer = $this->security->getUser();
         $tenant = $benutzer instanceof User ? $benutzer->getTenant() : null;
 
-        // Entscheidungen aus der Vorschau, je Zeilennummer:
+        // Decisions from the preview, by row number:
         //   {"5": {"action": "aktualisieren", "contactId": 17}}
-        // Fehlt eine Zeile, gilt das bisherige Verhalten: gleiche E-Mail wird
-        // uebersprungen. So bleibt ein Aufruf ohne Vorschau unveraendert
-        // gueltig und legt nie ungefragt Doppelte an.
+        // If a row is missing, the previous behavior applies: a matching
+        // email is skipped. That way a call without a preview stays
+        // valid unchanged and never creates duplicates unasked.
         $entscheidungenRoh = $request->request->get('decisions');
         $entscheidungen = is_string($entscheidungenRoh) ? json_decode($entscheidungenRoh, true) : [];
         if (!is_array($entscheidungen)) {
@@ -164,7 +163,7 @@ final class ImportController extends AbstractController
         $fehlerListe = [];
 
         foreach ($daten['rows'] as $i => $zeile) {
-            $zeilennummer = $i + 2; // 1 = Kopfzeile
+            $zeilennummer = $i + 2; // 1 = header row
 
             $email = $wert($zeile, 'email');
 
@@ -178,9 +177,10 @@ final class ImportController extends AbstractController
             $kontakt->setStatus('neu');
             $kontakt->setSource('import');
 
-            // Zusatzfelder uebernehmen und gegen ihre Definition pruefen —
-            // beim Import gelten dieselben Regeln wie beim Anlegen von Hand,
-            // sonst waere der Import ein Weg an der Pruefung vorbei.
+            // Adopt custom fields and validate them against their
+            // definition — the same rules apply on import as on manual
+            // creation, otherwise import would be a way around
+            // validation.
             if ($indexJeZusatzfeld !== []) {
                 $roh = [];
                 foreach ($indexJeZusatzfeld as $schluessel => $spalte) {
@@ -198,11 +198,11 @@ final class ImportController extends AbstractController
 
                 $kontakt->setCustomData($geprueft['werte']);
             }
-            // DSGVO, zwingend (TODO.md A11): KEINE Einwilligung setzen.
-            // consentGivenAt/consentText bleiben leer — ein Import ist keine
-            // Einwilligung und darf nicht als Umweg um die Einwilligungspflicht
-            // dienen. Importierte Kontakte sind bis zu einer echten,
-            // eigenstaendigen Einwilligung nicht bewerbbar (isContactable() = false).
+            // GDPR, mandatory: set NO consent. consentGivenAt/consentText
+            // stay empty — an import is not consent and must not serve
+            // as a detour around the consent requirement. Imported
+            // contacts are not marketable (isContactable() = false)
+            // until a real, standalone consent is given.
 
             $verstoesse = $this->validator->validate($kontakt);
             if (count($verstoesse) > 0) {
@@ -243,8 +243,8 @@ final class ImportController extends AbstractController
                 continue;
             }
 
-            // Ohne ausdrueckliche Entscheidung bleibt es beim bisherigen
-            // Verhalten: eine bereits bekannte E-Mail wird uebersprungen.
+            // Without an explicit decision, the previous behavior
+            // applies: an already known email is skipped.
             if ($aktion !== 'neu' && $email !== null) {
                 $schluessel = mb_strtolower($email);
                 if (isset($vorhandeneEmails[$schluessel])) {
@@ -283,11 +283,11 @@ final class ImportController extends AbstractController
     }
 
     /**
-     * E-Mail-Adressen, die im Mandanten des angemeldeten Benutzers bereits
-     * existieren — Grundlage fuer die Dublettenerkennung (gleiche E-Mail im
-     * selben Mandanten wird uebersprungen, nicht ueberschrieben).
+     * Email addresses that already exist in the logged-in user's tenant
+     * — the basis for duplicate detection (a matching email within the
+     * same tenant is skipped, not overwritten).
      *
-     * @return array<string, true> klein geschrieben als Schluessel
+     * @return array<string, true> lowercased as the key
      */
     private function bekannteEmails(?Tenant $tenant): array
     {
@@ -302,9 +302,9 @@ final class ImportController extends AbstractController
     }
 
     /**
-     * Firma per Name im Mandanten finden, sonst neu anlegen und verknuepfen
-     * (TODO.md A11). $cache haelt schon gefundene/angelegte Firmen innerhalb
-     * desselben Imports fest, damit dieselbe Firma nicht mehrfach angelegt wird.
+     * Finds a company by name within the tenant, or creates and links a
+     * new one. $cache tracks companies already found/created within the
+     * same import, so the same company is not created more than once.
      *
      * @param array<string, Company> $cache
      */
@@ -327,10 +327,10 @@ final class ImportController extends AbstractController
     }
 
     /**
-     * Datei lesen und die Zuordnung in Spaltenindizes uebersetzen — geteilt
-     * von Vorschau und Uebernahme, damit beide garantiert dieselbe Zeile
-     * gleich lesen. Liefert entweder ['fehler' => JsonResponse] oder die
-     * ausgewerteten Bestandteile.
+     * Reads the file and translates the mapping into column indexes —
+     * shared between preview and commit, so both are guaranteed to read
+     * the same row the same way. Returns either ['fehler' => JsonResponse]
+     * or the parsed components.
      *
      * @return array{fehler?: JsonResponse, daten?: array, wert?: callable, zusatz?: array<string, int>}
      */
@@ -357,9 +357,9 @@ final class ImportController extends AbstractController
             return ['fehler' => $this->fehler('Die Zuordnung passt nicht mehr zur Datei.', 422)];
         }
 
-        // Spaltenindex je Zielfeld ermitteln; zeigen mehrere Spalten auf
-        // dasselbe Feld, gilt die erste — der Rest wurde vom Nutzer
-        // versehentlich doppelt zugeordnet.
+        // Determine the column index per target field; if several columns
+        // point to the same field, the first one wins — the rest were
+        // accidentally mapped twice by the user.
         $indexJeFeld = [];
         $indexJeZusatzfeld = [];
         foreach (array_values($mapping) as $i => $feld) {
@@ -368,7 +368,7 @@ final class ImportController extends AbstractController
                 continue;
             }
 
-            // Selbst angelegte Felder kommen als "custom.<schluessel>".
+            // Custom fields arrive as "custom.<key>".
             if (is_string($feld) && str_starts_with($feld, 'custom.')) {
                 $schluessel = substr($feld, 7);
                 if (!isset($indexJeZusatzfeld[$schluessel])) {
@@ -390,11 +390,11 @@ final class ImportController extends AbstractController
     }
 
     /**
-     * Schritt 3: Vorschau mit Abgleich gegen den Bestand.
+     * Step 3: preview with a check against existing records.
      *
-     * Zeigt je Zeile, ob der Kunde moeglicherweise schon existiert, damit ein
-     * Mensch entscheiden kann: ergaenzen oder neu anlegen (Alexander, 24.08.).
-     * Aendert nichts — reine Auskunft.
+     * Shows, per row, whether the customer possibly already exists, so a
+     * human can decide: fill in gaps or create new. Changes nothing —
+     * read-only.
      */
     #[Route('/api/import/preview', name: 'import_preview', methods: ['POST'])]
     public function preview(Request $request): Response
@@ -420,16 +420,16 @@ final class ImportController extends AbstractController
                 ->setLastName($wert($zeile, 'lastName') ?? '')
                 ->setEmail($wert($zeile, 'email'));
 
-            $zeilennummer = $i + 2; // 1 = Kopfzeile
+            $zeilennummer = $i + 2; // 1 = header row
             $firmenName = $wert($zeile, 'company');
             $treffer = $this->matcher->treffer($kontakt, $firmenName);
             if ($treffer !== []) {
                 ++$mitTreffer;
             }
 
-            // Steht derselbe Mensch schon weiter oben in DERSELBEN Datei,
-            // wird die zweite Zeile vorgeschlagen zu ueberspringen — sonst
-            // entstuenden aus einem Lauf zwei Kontakte.
+            // If the same person already appears earlier in the SAME
+            // file, the second row is suggested to be skipped —
+            // otherwise a single run would create two contacts.
             $dateiDublette = $this->matcher->dateiDublette($kontakt, $firmenName);
             $this->matcher->merken($zeilennummer, $kontakt, $firmenName);
 
@@ -468,10 +468,10 @@ final class ImportController extends AbstractController
     }
 
     /**
-     * Holt den zu ergaenzenden Bestandskontakt und prueft ausdruecklich den
-     * Mandanten — nicht nur ueber den Doctrine-Filter (Analyse.md C18/C24:
-     * der Filter ist fuer ROLE_SUPERADMIN abgeschaltet, ein impliziter
-     * Schutz ist keiner, wenn eine Rolle ihn aushebelt).
+     * Fetches the existing contact to fill in and explicitly checks the
+     * tenant — not just via the Doctrine filter, which is switched off
+     * for ROLE_SUPERADMIN: an implicit protection is no protection at
+     * all once a role can bypass it.
      */
     private function bestandskontakt(mixed $id, ?Tenant $tenant): ?Contact
     {
@@ -489,19 +489,19 @@ final class ImportController extends AbstractController
     }
 
     /**
-     * Ergaenzt fehlende Angaben am Bestandskontakt aus der Importzeile.
+     * Fills in missing data on the existing contact from the import row.
      *
-     * Nur LEERE Felder werden gefuellt — vorhandene bleiben unangetastet.
-     * Dieselbe Regel wie beim Zusammenfuehren von Dubletten: eine Importdatei
-     * ist keine bessere Wahrheit als der gepflegte Datensatz, und wer
-     * jahrelang eine Telefonnummer korrigiert hat, will sie nicht durch eine
-     * alte Liste ueberschrieben bekommen.
+     * Only EMPTY fields are filled — existing ones are left untouched.
+     * Same rule as when merging duplicates: an import file is not a
+     * better source of truth than the maintained record, and someone who
+     * has corrected a phone number over the years does not want it
+     * overwritten by an old list.
      *
-     * Einwilligungsfelder fasst diese Methode bewusst NICHT an: ein Import
-     * belegt keine Einwilligung (Analyse.md C6/C33), auch nicht ueber den
-     * Umweg "Bestandskontakt ergaenzen".
+     * This method deliberately does NOT touch consent fields: an import
+     * does not constitute consent, not even by the detour of "filling in
+     * an existing contact".
      *
-     * @return list<string> Bezeichnungen der tatsaechlich gefuellten Felder
+     * @return list<string> labels of the fields actually filled in
      */
     private function ergaenzen(Contact $ziel, Contact $ausDatei): array
     {
@@ -525,7 +525,7 @@ final class ImportController extends AbstractController
             }
         }
 
-        // Zusatzfelder: ebenfalls nur Luecken fuellen.
+        // Custom fields: also only fill gaps.
         $zielDaten = $ziel->getCustomData() ?? [];
         foreach ($ausDatei->getCustomData() ?? [] as $schluessel => $wert) {
             if (!array_key_exists($schluessel, $zielDaten) || $zielDaten[$schluessel] === null) {

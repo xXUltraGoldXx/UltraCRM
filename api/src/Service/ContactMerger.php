@@ -5,15 +5,16 @@ namespace App\Service;
 use App\Entity\Contact;
 
 /**
- * Der Feldabgleich beim Zusammenfuehren zweier Kontakte.
+ * Field-by-field reconciliation when merging two contacts.
  *
- * Bewusst ohne Datenbank: hier steckt die Regel, die niemanden bewerbbar
- * machen darf, der es vorher nicht war. Sie muss ohne laufende Anwendung
- * pruefbar sein — im Controller waere sie das nicht.
+ * Deliberately without a database: this is where the rule lives that
+ * merging must never make a contact reachable who wasn't reachable
+ * before. It has to be testable without a running application — it
+ * wouldn't be, in a controller.
  */
 final class ContactMerger
 {
-    /** Einfache Textfelder, bei denen nur Luecken gefuellt werden. */
+    /** Simple text fields where only gaps get filled in. */
     private const FELDER = [
         'FirstName' => 'Vorname',
         'LastName' => 'Nachname',
@@ -25,19 +26,19 @@ final class ContactMerger
     ];
 
     /**
-     * Uebernimmt fehlende Angaben der Quelle in das Ziel.
+     * Copies missing data from the source into the target.
      *
-     * @param bool $sichereDublette Nur bei einer sicheren Dublette (gleiche
-     *        E-Mail) handelt es sich nachweislich um dieselbe Person. Bei
-     *        einer bloss moeglichen Dublette wird die Einwilligung NICHT
-     *        uebernommen — sonst erbt eine reale Person die Einwilligung
-     *        einer anderen, etwa Vater und Sohn im selben Betrieb.
+     * @param bool $sichereDublette Only with a confirmed duplicate (same
+     *        email) is it provably the same person. For a merely possible
+     *        duplicate, consent is NOT copied over — otherwise one real
+     *        person would inherit another's consent, e.g. father and son
+     *        at the same company.
      *
-     * @return string[] Bezeichnungen der uebernommenen Felder
+     * @return string[] Labels of the fields that were copied
      */
     public function uebernehmen(Contact $ziel, Contact $quelle, bool $sichereDublette): array
     {
-        // Vorher festhalten: war einer der beiden bewerbbar?
+        // Record beforehand: was either contact already reachable?
         $vorherBewerbbar = $ziel->isContactable() || $quelle->isContactable();
 
         $uebernommen = [];
@@ -59,17 +60,18 @@ final class ContactMerger
             $uebernommen[] = 'Firma';
         }
 
-        // Ein Widerruf wird immer uebernommen, auch bei einer nur moeglichen
-        // Dublette: er faellt in die sichere Richtung.
+        // A withdrawal is always copied over, even for a merely possible
+        // duplicate: it errs on the safe side.
         if ($quelle->getConsentWithdrawnAt() !== null && $ziel->getConsentWithdrawnAt() === null) {
             $ziel->setConsentWithdrawnAt($quelle->getConsentWithdrawnAt());
             $uebernommen[] = 'Widerruf';
         }
 
-        // Die Einwilligung dagegen nur bei einer sicheren Dublette — und dann
-        // vollstaendig. Wuerde nur consentGivenAt wandern, der offene
-        // Bestaetigungslink aber nicht, waere ein Kontakt nach dem
-        // Zusammenfuehren bewerbbar, dessen Double-Opt-in nie geklickt wurde.
+        // Consent, on the other hand, is only copied for a confirmed
+        // duplicate — and then completely. If only consentGivenAt moved
+        // over but not the pending confirmation link, a contact would end
+        // up reachable after the merge whose double opt-in was never
+        // actually clicked.
         if ($sichereDublette && $ziel->getConsentGivenAt() === null && $quelle->getConsentGivenAt() !== null) {
             $ziel->setConsentGivenAt($quelle->getConsentGivenAt());
             $ziel->setConsentText($quelle->getConsentText());
@@ -78,7 +80,7 @@ final class ContactMerger
             $uebernommen[] = 'Einwilligung';
         }
 
-        // Zusatzfelder: nur fehlende uebernehmen
+        // Custom fields: only copy over what's missing
         $zielDaten = $ziel->getCustomData() ?? [];
         foreach ($quelle->getCustomData() ?? [] as $schluessel => $wert) {
             if (!array_key_exists($schluessel, $zielDaten) || $zielDaten[$schluessel] === null) {
@@ -88,9 +90,9 @@ final class ContactMerger
         }
         $ziel->setCustomData($zielDaten);
 
-        // Letzte Sicherung gegen kuenftige Aenderungen an den Regeln oben:
-        // Zusammenfuehren darf niemanden bewerbbar machen, der es vorher
-        // nicht war. Schlaegt das an, liegt ein Programmfehler vor.
+        // Final safeguard against future changes to the rules above:
+        // merging must never make a contact reachable who wasn't
+        // reachable before. If this triggers, it's a bug.
         if (!$vorherBewerbbar && $ziel->isContactable()) {
             throw new \LogicException(
                 'Zusammenfuehren haette einen Kontakt bewerbbar gemacht, der es vorher nicht war.'

@@ -10,16 +10,17 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Aktiviert den Mandanten-Filter fuer jeden Request.
+ * Activates the tenant filter for every request.
  *
- * Regeln:
- * - Superadmin: Filter bleibt aus, sieht alles (Mandanten-Verwaltung).
- * - Normaler User: Filter auf seinen Mandanten.
- * - Kein User oder User ohne Mandant: Filter auf 0 — mandantengebundene
- *   Daten sind damit grundsaetzlich unsichtbar. Sicherheitsrichtung
- *   "standardmaessig zu", nicht "standardmaessig offen".
+ * Rules:
+ * - Superadmin: filter stays off, sees everything (tenant management).
+ * - Regular user: filter set to their own tenant.
+ * - No user, or a user without a tenant: filter set to 0 — tenant-owned
+ *   data is then invisible by default. Security defaults to closed, not
+ *   to open.
  *
- * Prioritaet 4: nach der Firewall (JWT-Auth, Prioritaet 8), vor Controllern.
+ * Priority 4: runs after the firewall (JWT auth, priority 8), before
+ * controllers.
  */
 final class TenantFilterSubscriber implements EventSubscriberInterface
 {
@@ -42,7 +43,7 @@ final class TenantFilterSubscriber implements EventSubscriberInterface
 
         $user = $this->security->getUser();
         if ($user instanceof User && in_array('ROLE_SUPERADMIN', $user->getRoles(), true)) {
-            return; // Filter bleibt deaktiviert
+            return; // filter stays disabled
         }
 
         $tenantId = 0;

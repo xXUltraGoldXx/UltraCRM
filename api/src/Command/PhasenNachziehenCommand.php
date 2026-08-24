@@ -16,16 +16,15 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Zieht den Umstieg auf konfigurierbare Phasen (A5) nach.
+ * Backfills the migration to configurable deal stages.
  *
- * Auf dem Produktivserver lief das am 24.08. von Hand. Damit war es genau
- * einmal richtig — ein zweiter Server, ein frischer Checkout oder eine
- * Wiederherstellung aus einem Backup von vor A5 haette lauter Vorgaenge ohne
- * Phase, und weil die Phase am Vorgang Pflicht ist, liesse sich an diesen
- * Vorgaengen anschliessend gar nichts mehr aendern (Review-Befund,
- * Schwere 50).
+ * This was run once by hand in production right after the migration
+ * shipped, so it was correct exactly that one time. A second server, a
+ * fresh checkout, or a restore from a backup that predates this migration
+ * would have deals with no stage at all — and since a deal's stage is
+ * required, such deals could no longer be edited afterwards.
  *
- * Der Befehl ist mehrfach ausfuehrbar: er legt nur an, was fehlt.
+ * Safe to run multiple times: it only creates what is missing.
  */
 #[AsCommand(
     name: 'app:phasen:nachziehen',
@@ -55,9 +54,8 @@ final class PhasenNachziehenCommand extends Command
         $stil = new SymfonyStyle($input, $output);
         $probe = (bool) $input->getOption('probe');
 
-        // Der Mandantenfilter wuerde hier im Weg stehen: der Befehl laeuft
-        // ohne angemeldeten Benutzer und muss ausdruecklich alle Mandanten
-        // sehen.
+        // The tenant filter would get in the way here: this command runs
+        // without a logged-in user and must explicitly see all tenants.
         if ($this->em->getFilters()->isEnabled('tenant_filter')) {
             $this->em->getFilters()->disable('tenant_filter');
         }
@@ -116,10 +114,9 @@ final class PhasenNachziehenCommand extends Command
     }
 
     /**
-     * Ordnet Vorgaenge zu, die noch keine Phase haben. Existiert die alte
-     * Textspalte noch (Stand vor der Umstellung), wird ihr Wert auf den
-     * Phasennamen abgebildet; sonst landet der Vorgang in der ersten Phase
-     * seines Mandanten.
+     * Assigns a stage to deals that don't have one yet. If the old text
+     * column still exists (pre-migration state), its value is mapped to a
+     * stage name; otherwise the deal lands in its tenant's first stage.
      */
     private function vorgaengeZuordnen(SymfonyStyle $stil, bool $probe): int
     {

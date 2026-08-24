@@ -9,20 +9,21 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Liefert den Rechtekatalog fuer die Benutzerverwaltung.
+ * Returns the permission catalog for user management.
  *
- * Der Katalog steht im PHP-Code (Permissions::KATALOG) und wird NICHT im
- * Frontend zweitgepflegt — sonst laufen beide Listen auseinander und ein
- * Recht existiert in der Oberflaeche, das die API gar nicht kennt.
+ * The catalog lives in PHP code (Permissions::KATALOG) and is NOT
+ * maintained a second time in the frontend — otherwise the two lists
+ * would drift apart and a permission could exist in the UI that the API
+ * does not even know about.
  */
 final class PermissionCatalogController extends AbstractController
 {
     #[Route('/api/permissions', name: 'permission_catalog', methods: ['GET'])]
     public function katalog(): Response
     {
-        // Ausdrückliche Prüfung statt Attribut: IsGranted-Attribute werden in
-        // diesen Controllern nicht ausgewertet (Analyse.md C13). Beim ersten
-        // Versuch lieferte der Endpunkt jedem angemeldeten Benutzer 200.
+        // Explicit check instead of an attribute: #[IsGranted] attributes
+        // are not evaluated on these controllers. The first attempt at
+        // this endpoint returned 200 for every logged-in user.
         $this->denyAccessUnlessGranted('ROLE_ADMIN');
 
         $gruppen = [];
@@ -37,11 +38,11 @@ final class PermissionCatalogController extends AbstractController
             ];
         }
 
-        // Bereiche fuer die Berechtigungsgruppen (A14). Der Katalog ist die
-        // einzige Quelle: die Oberflaeche baut ihre Schalter daraus, statt
-        // die Liste ein zweites Mal zu pflegen. Ein Bereich zeigt nur die
-        // Stufen, die es dort wirklich gibt — eine Auswertung laesst sich
-        // nicht "schreiben".
+        // Sections for the permission groups. The catalog is the single
+        // source of truth: the frontend builds its toggles from it
+        // instead of maintaining the list a second time. A section only
+        // shows the levels that genuinely exist for it — a reports
+        // section, for example, cannot be "written to".
         $bereiche = [];
         foreach (Permissions::BEREICHE as $schluessel => $stufen) {
             $bereiche[] = [

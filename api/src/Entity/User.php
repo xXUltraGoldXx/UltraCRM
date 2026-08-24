@@ -53,31 +53,31 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private array $roles = [];
 
     /**
-     * Feingranulare Rechte, z.B. ['contacts.manage', 'privacy.view'] — siehe
-     * Permissions.php.
+     * Fine-grained permissions, e.g. ['contacts.manage', 'privacy.view']
+     * — see Permissions.php.
      *
-     * Rueckfallebene seit A14: Ist eine Berechtigungsgruppe gesetzt, gilt
-     * ausschliesslich diese. Das Array bleibt bestehen, damit
-     * Bestandsbenutzer im Moment der Umstellung nicht rechtelos dastehen.
+     * Fallback layer: if a permission group is set, it takes precedence
+     * exclusively. This array is kept around so that existing users
+     * aren't left without permissions at the moment of the switchover.
      */
     #[ORM\Column(type: 'json')]
     #[Groups(['user:read', 'user:write'])]
     private array $permissions = [];
 
     /**
-     * Frei benannte Berechtigungsgruppe mit Rechten je Bereich (A14).
-     * Gesetzt schlaegt sie das `permissions`-Array — siehe Permissions::hat().
+     * Freely named permission group with permissions per area. When set,
+     * it overrides the `permissions` array — see Permissions::hat().
      */
     #[ORM\ManyToOne(targetEntity: PermissionGroup::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     #[Groups(['user:read', 'user:write'])]
     private ?PermissionGroup $permissionGroup = null;
 
-    /** Gehashtes Passwort */
+    /** Hashed password. */
     #[ORM\Column]
     private ?string $password = null;
 
-    /** Nur beim Anlegen/Ändern übergeben, wird nie ausgeliefert */
+    /** Only passed in when creating/changing the password; never returned. */
     #[Groups(['user:write'])]
     private ?string $plainPassword = null;
 
@@ -86,9 +86,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private bool $active = true;
 
     /**
-     * Mandant des Users. NULL ist ausschliesslich fuer Superadmins zulaessig
-     * (die stehen ueber den Mandanten); jeder normale User gehoert zu genau
-     * einem Mandanten, sonst sieht er durch den tenant_filter nichts.
+     * The user's tenant. NULL is allowed only for superadmins (who stand
+     * above the tenants); every normal user belongs to exactly one
+     * tenant, otherwise the tenant_filter leaves them seeing nothing.
      */
     #[ORM\ManyToOne(targetEntity: Tenant::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
@@ -105,7 +105,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /** Modul #9 Urlaubsverwaltung: Kalenderjahr (1.1.-31.12.), ENTSCHIEDEN Default 30. */
+    /** Vacation days: calendar year (Jan 1 – Dec 31), default is 30 days. */
     #[ORM\Column]
     #[Groups(['user:read', 'user:write'])]
     private int $vacationDaysPerYear = 30;

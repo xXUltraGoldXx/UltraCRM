@@ -17,12 +17,12 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Eine Phase innerhalb einer Pipeline.
+ * A stage within a pipeline.
  *
- * `art` ersetzt die frueheren CLOSED_STAGES: nicht der Name entscheidet, ob
- * ein Vorgang abgeschlossen ist, sondern diese Angabe. Sonst haette ein
- * Mandant, der seine Endphase "Auftrag erteilt" nennt, einen Vorgang, der
- * nie als gewonnen zaehlt.
+ * `art` (kind) replaces the former CLOSED_STAGES: it's this field, not the
+ * name, that decides whether a deal is closed. Otherwise a tenant naming
+ * their final stage "Order placed" would have a deal that never counts as
+ * won.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'stage')]
@@ -32,8 +32,9 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Get(security: "is_granted('PERM', 'deals.view')"),
         new Post(security: "is_granted('PERM', 'pipelines.manage')", processor: StageProcessor::class),
         new Patch(security: "is_granted('PERM', 'pipelines.manage')", processor: StageProcessor::class),
-        // Loeschen ist unumkehrbar und nimmt bei einer Pipeline alle Phasen
-        // mit — dieselbe Huerde wie bei Kontakt, Firma und Vorgang (C17).
+        // Deletion is irreversible and takes all of a pipeline's stages
+        // with it — the same safeguard used for contact, company, and
+        // deal deletion.
         new Delete(security: "is_granted('PERM', 'pipelines.delete')", processor: PipelineRemoveProcessor::class),
     ],
     normalizationContext: ['groups' => ['stage:read']],
@@ -47,7 +48,7 @@ class Stage implements TenantOwnedInterface
     public const GEWONNEN = 'gewonnen';
     public const VERLOREN = 'verloren';
 
-    /** Was die Phase fuer die Auswertung bedeutet. */
+    /** What the stage means for reporting. */
     public const ARTEN = [self::OFFEN, self::GEWONNEN, self::VERLOREN];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column]
@@ -91,13 +92,13 @@ class Stage implements TenantOwnedInterface
     public function setPosition(int $v): static { $this->position = $v; return $this; }
 
     /**
-     * Zaehlt ein Vorgang in dieser Phase noch als offen?
+     * Does a deal in this stage still count as open?
      *
-     * Gefragt wird nach den Abschlussarten, nicht nach OFFEN: ein unbekannter
-     * Wert — etwa aus einer Migration oder einem kuenftigen Umbau — soll
-     * dazu fuehren, dass ein Vorgang weiter im offenen Geschaeft auftaucht.
-     * Andersherum verschwaende er still aus der Liste und zaehlte weder als
-     * gewonnen noch als verloren.
+     * This checks against the closed kinds, not against OFFEN (open): an
+     * unknown value — say from a migration or a future rework — should
+     * make a deal keep showing up in the open pipeline. The other way
+     * round it would silently disappear from the list, counting as
+     * neither won nor lost.
      */
     public function istOffen(): bool
     {

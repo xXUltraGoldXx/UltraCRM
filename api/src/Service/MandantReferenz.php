@@ -9,13 +9,13 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
- * Prueft, dass ein Datensatz nur auf Datensaetze desselben Mandanten zeigt.
+ * Checks that a record only points to records of the same tenant.
  *
- * Der Doctrine-Filter allein genuegt dafuer nicht: fuer ROLE_SUPERADMIN ist
- * er abgeschaltet. Ohne diese Pruefung liess sich ein Vorgang aus Mandant A
- * an eine Phase aus Mandant B haengen — nachgestellt am 24.08. mit Vorgang 7
- * und Phase 26 (Analyse.md C24). Derselbe Fehler wie C18, nur an anderer
- * Stelle: ein impliziter Schutz ist keiner, wenn eine Rolle ihn aushebelt.
+ * The Doctrine filter alone isn't enough for this: it's disabled for
+ * ROLE_SUPERADMIN. Without this check, a deal from tenant A could be
+ * attached to a stage from tenant B — this was reproduced and confirmed
+ * as a real issue. The lesson, seen here for the second time in the
+ * codebase: an implicit safeguard isn't one, if a role can bypass it.
  */
 final class MandantReferenz
 {
@@ -24,9 +24,9 @@ final class MandantReferenz
     }
 
     /**
-     * @param TenantOwnedInterface $datensatz  der Datensatz, der verweist
-     * @param TenantOwnedInterface|null $ziel  worauf er zeigt
-     * @param string $bezeichnung              wie das Ziel in der Meldung heisst
+     * @param TenantOwnedInterface $datensatz  the record that holds the reference
+     * @param TenantOwnedInterface|null $ziel  what it points to
+     * @param string $bezeichnung              how the target is named in the error message
      */
     public function pruefe(TenantOwnedInterface $datensatz, ?TenantOwnedInterface $ziel, string $bezeichnung): void
     {

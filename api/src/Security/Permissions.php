@@ -5,14 +5,14 @@ namespace App\Security;
 use App\Entity\User;
 
 /**
- * Rechtekatalog des CRM.
+ * Permission catalog for the CRM.
  *
- * Zwei Stufen je Bereich: `view` zum Ansehen, `manage` zum Aendern. Wer
- * `manage` hat, kann auch ansehen — sonst muesste man beim Anlegen eines
- * Benutzers immer zwei Haken setzen und wuerde den einen vergessen.
+ * Two levels per area: `view` to see, `manage` to change. Anyone with
+ * `manage` can also view — otherwise creating a user would always require
+ * setting two checkboxes, and one of them would eventually get forgotten.
  *
- * Admins (ROLE_ADMIN) haben immer alles; die Liste steuert die Rechte der
- * uebrigen Mitarbeiter.
+ * Admins (ROLE_ADMIN) always have everything; this list controls the
+ * permissions of everyone else.
  */
 final class Permissions
 {
@@ -30,17 +30,17 @@ final class Permissions
     public const IMPORT_EXPORT = 'importexport.use';
 
     /**
-     * Bereiche und die Stufen, die es dort tatsaechlich gibt — Grundlage der
-     * frei anlegbaren Berechtigungsgruppen (A14).
+     * Areas and the levels that actually exist for each — the basis for
+     * the freely configurable permission groups.
      *
-     * Bewusst NICHT ueberall drei Stufen: Eine Auswertung laesst sich nicht
-     * "schreiben", ein Import nicht "loeschen". Ein Schalter ohne Wirkung
-     * waere eine Luege in der Oberflaeche — deshalb steht hier je Bereich,
-     * was er kennt.
+     * Deliberately NOT three levels everywhere: a report can't be
+     * "written", an import can't be "deleted". A toggle with no effect
+     * would be a lie in the UI — so this lists, per area, exactly what it
+     * supports.
      *
-     * "contacts" umfasst Kontakte UND Firmen: die teilen sich seit Beginn
-     * dieselben Rechte, und sie zu trennen waere eine fachliche Aenderung,
-     * die niemand verlangt hat.
+     * "contacts" covers both contacts AND companies: they have shared the
+     * same permissions since the beginning, and splitting them would be a
+     * business-logic change nobody has asked for.
      *
      * @var array<string, list<string>>
      */
@@ -55,7 +55,7 @@ final class Permissions
         'importexport' => ['lesen'],
     ];
 
-    /** Klartext je Bereich fuer die Oberflaeche. */
+    /** Plain-text labels per area, for the UI. */
     public const BEREICH_NAMEN = [
         'contacts' => 'Kontakte und Firmen',
         'deals' => 'Vertrieb',
@@ -68,9 +68,9 @@ final class Permissions
     ];
 
     /**
-     * Uebersetzt Bereich + Stufe in den Rechte-Schluessel, mit dem das
-     * System seit jeher arbeitet. Gibt es die Kombination nicht, kommt null
-     * zurueck — der Schalter wird dann schlicht ignoriert.
+     * Translates area + level into the permission key the system has
+     * always used internally. Returns null for an unknown combination —
+     * the toggle is then simply ignored.
      */
     public static function schluessel(string $bereich, string $stufe): ?string
     {
@@ -97,7 +97,7 @@ final class Permissions
         };
     }
 
-    /** Alle Rechte mit deutscher Bezeichnung — Grundlage der Oberflaeche. */
+    /** All permissions with their (German) label, as shown in the UI. */
     public const KATALOG = [
         'Kontakte und Firmen' => [
             self::CONTACTS_VIEW => 'Ansehen',
@@ -127,7 +127,7 @@ final class Permissions
         ],
     ];
 
-    /** manage schliesst view ein. */
+    /** manage implies view. */
     private const IMPLIZIT = [
         self::CONTACTS_MANAGE => self::CONTACTS_VIEW,
         self::DEALS_MANAGE => self::DEALS_VIEW,
@@ -148,8 +148,8 @@ final class Permissions
     }
 
     /**
-     * Darf dieser Benutzer das? Admins immer; sonst das Recht selbst oder
-     * ein Recht, das es einschliesst.
+     * Is this user allowed to do that? Admins always are; otherwise it
+     * checks the permission itself or one that implies it.
      */
     public static function hat(?User $user, string $recht): bool
     {
@@ -162,12 +162,13 @@ final class Permissions
             return true;
         }
 
-        // Erst die Berechtigungsgruppe (A14), dann die alte Rechteliste.
+        // Permission group first, then the legacy permission list as a
+        // fallback.
         //
-        // Die Rueckfallebene bleibt bewusst bestehen, bis jeder Benutzer eine
-        // Gruppe hat: Wuerde hier sofort nur noch die Gruppe zaehlen, waeren
-        // im Moment der Umstellung alle Bestandsbenutzer ohne Rechte —
-        // einschliesslich derer, die gerade angemeldet sind.
+        // The fallback stays in place deliberately, until every user has a
+        // group: if only the group counted from the moment this shipped,
+        // every existing user would suddenly have no permissions at all —
+        // including those currently logged in.
         $eigene = $user->getPermissionGroup()?->alsRechteSchluessel()
             ?? $user->getPermissions();
 

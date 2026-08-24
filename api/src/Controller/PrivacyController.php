@@ -18,11 +18,11 @@ use Symfony\Component\HttpKernel\Attribute\IsGranted;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * DSGVO-Werkzeuge: Auskunft, Loeschung mit Nachweis, Widerruf.
+ * GDPR tools: subject access, deletion with a record, consent withdrawal.
  *
- * Alle Endpunkte laufen ueber den angemeldeten Benutzer und damit ueber den
- * Mandantenfilter — ein Kontakt eines fremden Mandanten wird gar nicht erst
- * gefunden.
+ * All endpoints run through the logged-in user and therefore through the
+ * tenant filter — a contact belonging to a foreign tenant is never even
+ * found.
  */
 final class PrivacyController extends AbstractController
 {
@@ -34,8 +34,8 @@ final class PrivacyController extends AbstractController
     }
 
     /**
-     * Auskunft nach Art. 15: alles, was zu dieser Person gespeichert ist —
-     * Stammdaten, Einwilligungs-Historie, Aktivitaeten, Vorgaenge.
+     * Subject access request under Art. 15: everything stored about this
+     * person — core data, consent history, activities, deals.
      */
     #[Route('/api/privacy/contacts/{id}/export', name: 'privacy_export', methods: ['GET'])]
     public function export(int $id): Response
@@ -49,9 +49,9 @@ final class PrivacyController extends AbstractController
 
         $aktivitaeten = $this->em->getRepository(Activity::class)->findBy(['contact' => $kontakt]);
         $vorgaenge = $this->em->getRepository(Deal::class)->findBy(['contact' => $kontakt]);
-        // Auch die Aenderungen gehoeren in die Auskunft: "Was wurde mit
-        // meinen Daten gemacht?" ist die Frage hinter Art. 15, und sie laesst
-        // sich ohne Historie nicht beantworten.
+        // The change history belongs in the disclosure too: "what was
+        // done with my data?" is the question behind Art. 15, and it
+        // cannot be answered without the history.
         $aenderungen = $this->em->getRepository(ChangeLog::class)->findBy(
             ['subjectType' => 'contact', 'subjectId' => $kontakt->getId()],
             ['changedAt' => 'DESC'],
@@ -120,22 +120,22 @@ final class PrivacyController extends AbstractController
     }
 
     /**
-     * Loeschung nach Art. 17. Der Kontakt und alles, was an ihm haengt,
-     * verschwindet; zurueck bleibt nur ein Nachweis OHNE Personendaten.
-     */
-    /**
-     * Nur Administratoren. Die endgueltige Loeschung ist destruktiver als das
-     * normale Loeschen eines Kontakts — sie darf nicht schwaecher geschuetzt
-     * sein als jenes (Review-Befund, Schwere 50).
+     * Deletion under Art. 17. The contact and everything attached to it
+     * disappears; only a record WITHOUT personal data remains.
+     *
+     * Administrators only. Permanent deletion is more destructive than
+     * a regular contact deletion — it must not be protected more weakly
+     * than that.
      */
     #[IsGranted('ROLE_ADMIN')]
     #[Route('/api/privacy/contacts/{id}/erase', name: 'privacy_erase', methods: ['POST'])]
     public function erase(int $id, Request $request): Response
     {
-        // Endgueltige Loeschung eines Menschen (Art. 17): eigener Schalter.
-        // Vergeben wird er von keiner Vorlage — nur das Admin-Konto kommt
-        // durch, bis jemand ihn bewusst setzt (Alexander: "einstellbar die
-        // Berechtigung und ja erstmal nur admin").
+        // Permanently deleting a person (Art. 17) gets its own permission.
+        // No template grants it by default — only the admin account
+        // passes until someone deliberately assigns it. Intentionally
+        // conservative for now: the permission is configurable, but
+        // starts out admin-only.
         $this->denyAccessUnlessGranted('PERM', 'privacy.delete');
 
         $daten = json_decode($request->getContent(), true);
@@ -153,16 +153,17 @@ final class PrivacyController extends AbstractController
         $aktivitaeten = $this->em->getRepository(Activity::class)->findBy(['contact' => $kontakt]);
         $vorgaenge = $this->em->getRepository(Deal::class)->findBy(['contact' => $kontakt]);
 
-        // Das Aenderungsprotokoll enthaelt alte und neue Feldwerte, also
-        // Personendaten (frueherer Name, alte Telefonnummer). Es MUSS
-        // mitgeloescht werden — sonst stuende der Name nach der "Loeschung"
-        // weiter im Protokoll und die Loeschung waere keine.
+        // The change log contains old and new field values, i.e.
+        // personal data (a former name, an old phone number). It MUST be
+        // deleted along with the contact — otherwise the name would
+        // still sit in the log after the "deletion", and it would not be
+        // one.
         $protokolleintraege = $this->em->getRepository(ChangeLog::class)->findBy(
             ['subjectType' => 'contact', 'subjectId' => $kontakt->getId()],
         );
 
-        // Pseudonym: erlaubt spaeter die Zuordnung einer Anfrage, gibt aber
-        // die geloeschten Daten nicht preis.
+        // Pseudonym: allows a later request to be matched up without
+        // revealing the deleted data.
         $pseudonym = substr(hash('sha256', $id . '|' . ($mandant?->getId() ?? 0) . '|' . $this->appSecret), 0, 32);
 
         $benutzer = $this->security->getUser();
@@ -182,9 +183,9 @@ final class PrivacyController extends AbstractController
         foreach ($protokolleintraege as $c) {
             $this->em->remove($c);
         }
-        // Vorgaenge bleiben als Geschaeftsvorfall bestehen, verlieren aber
-        // den Personenbezug — Buchhaltungspflichten und Loeschanspruch
-        // schliessen einander hier nicht aus.
+        // Deals remain as a business record but lose their link to the
+        // person — accounting retention duties and the right to erasure
+        // do not conflict here.
         foreach ($vorgaenge as $d) {
             $d->setContact(null);
         }
@@ -202,7 +203,7 @@ final class PrivacyController extends AbstractController
         ]);
     }
 
-    /** Widerruf der Einwilligung — ab sofort keine Werbung mehr. */
+    /** Withdraws consent — no more marketing contact from now on. */
     #[IsGranted('PERM', 'privacy.manage')]
     #[Route('/api/privacy/contacts/{id}/withdraw', name: 'privacy_withdraw', methods: ['POST'])]
     public function withdraw(int $id): Response
@@ -226,7 +227,7 @@ final class PrivacyController extends AbstractController
         ]);
     }
 
-    /** Kontakte, deren Aufbewahrungsfrist abgelaufen ist. */
+    /** Contacts whose retention period has expired. */
     #[Route('/api/privacy/due-deletions', name: 'privacy_due', methods: ['GET'])]
     public function dueDeletions(): Response
     {

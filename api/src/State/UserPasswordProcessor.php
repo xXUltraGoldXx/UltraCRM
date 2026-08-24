@@ -12,13 +12,12 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Hasht das plainPassword und setzt den Mandanten, bevor ein User
- * gespeichert wird.
+ * Hashes the plainPassword and sets the tenant before a user is saved.
  *
- * Der Mandant kommt vom anlegenden Administrator, NIE aus dem Request:
- * sonst koennte ein Mandanten-Admin Benutzer in fremden Mandanten anlegen.
- * Ohne diese Zuweisung waere ein neuer Benutzer ausserdem nutzlos — der
- * Mandantenfilter steht auf "zu" und er saehe gar nichts.
+ * The tenant comes from the creating administrator, NEVER from the
+ * request: otherwise a tenant admin could create users in a foreign
+ * tenant. Without this assignment a new user would also be useless —
+ * the tenant filter fails closed and they would see nothing at all.
  *
  * @implements ProcessorInterface<User, User|void>
  */
@@ -43,9 +42,10 @@ final class UserPasswordProcessor implements ProcessorInterface
                 $data->eraseCredentials();
             }
 
-            // Nur beim Anlegen und nur, wenn der Anlegende selbst zu einem
-            // Mandanten gehoert. Ein Superadmin ohne Mandanten legt bewusst
-            // mandantenlose Benutzer an (die dann zugeordnet werden muessen).
+            // Only on creation, and only if the creator themselves
+            // belongs to a tenant. A superadmin without a tenant
+            // deliberately creates tenant-less users (which then need to
+            // be assigned).
             if ($data->getId() === null && $data->getTenant() === null) {
                 $anlegender = $this->security->getUser();
                 if ($anlegender instanceof User && $anlegender->getTenant() !== null) {
@@ -58,13 +58,13 @@ final class UserPasswordProcessor implements ProcessorInterface
     }
 
     /**
-     * Ein Benutzer darf sich selbst bearbeiten — Anzeigename, Passwort. Rollen,
-     * Rechte, Aktiv-Schalter und Mandant gehoeren nicht dazu.
+     * A user may edit themselves — display name, password. Roles,
+     * permissions, the active flag and the tenant are not part of that.
      *
-     * Ohne diese Pruefung genuegte ein PATCH auf den eigenen Datensatz mit
-     * `{"roles": ["ROLE_ADMIN"]}`, um sich zum Administrator zu machen: die
-     * Operation erlaubt `object == user`, und beide Felder stehen in der
-     * Schreibgruppe (Analyse.md C37).
+     * Without this check, a PATCH on one's own record with
+     * `{"roles": ["ROLE_ADMIN"]}` was enough to self-promote to
+     * administrator: the operation allows `object == user`, and both
+     * fields are in the writable group.
      */
     private function keineSelbstBefoerderung(User $data): void
     {
@@ -74,8 +74,8 @@ final class UserPasswordProcessor implements ProcessorInterface
 
         $vorher = $this->em->getUnitOfWork()->getOriginalEntityData($data);
         if ($vorher === []) {
-            // Kein bekannter Vorzustand: das waere ein Anlegevorgang, und den
-            // laesst die Operation ohnehin nur Administratoren durch.
+            // No known prior state: that would be a creation, and the
+            // operation only lets administrators through for that anyway.
             return;
         }
 

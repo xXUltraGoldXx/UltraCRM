@@ -7,17 +7,17 @@ use App\Entity\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Findet mutmassliche Dubletten im Bestand.
+ * Finds probable duplicates in the contact list.
  *
- * Zwei Stufen, bewusst getrennt:
- * - sicher:    gleiche E-Mail. Eine Adresse gehoert genau einer Person.
- * - moeglich:  gleicher Nach- und Vorname in derselben Firma. Das kann
- *              zutreffen, muss aber nicht (Vater und Sohn im Betrieb) —
- *              deshalb wird nie automatisch zusammengefuehrt, sondern nur
- *              vorgeschlagen.
+ * Two levels, deliberately kept separate:
+ * - confirmed: same email. One address belongs to exactly one person.
+ * - possible:  same first and last name at the same company. That may or
+ *              may not be the same person (father and son at the same
+ *              company) — so this is never merged automatically, only
+ *              suggested.
  *
- * Der Vergleich laeuft ueber den Mandantenfilter; ueber Mandantengrenzen
- * hinweg wird nichts verglichen.
+ * The comparison runs through the tenant filter; nothing is ever compared
+ * across tenant boundaries.
  */
 final class DuplicateFinder
 {
@@ -38,7 +38,7 @@ final class DuplicateFinder
 
         $gruppen = [];
 
-        // Stufe 1: gleiche E-Mail
+        // Level 1: same email
         $jeEmail = [];
         foreach ($alle as $k) {
             $mail = mb_strtolower(trim((string) $k->getEmail()));
@@ -56,7 +56,7 @@ final class DuplicateFinder
             }
         }
 
-        // Stufe 2: gleicher Name in derselben Firma
+        // Level 2: same name at the same company
         $schonGemeldet = [];
         foreach ($gruppen as $g) {
             foreach ($g['kontakte'] as $k) {
@@ -70,9 +70,10 @@ final class DuplicateFinder
                 continue;
             }
 
-            // Ohne Firmenbezug ist Namensgleichheit kein brauchbares Signal:
-            // zwei "Michael Schmidt" ohne Firma sind meistens zwei Menschen.
-            // Solche Paare hier zu melden waere die haeufigste Fehlmeldung.
+            // Without a company, matching names aren't a useful signal:
+            // two "Michael Schmidt" entries with no company are usually
+            // two different people. Flagging such pairs here would be the
+            // most common false positive.
             if ($k->getCompany() === null || trim($k->getDisplayName()) === '') {
                 continue;
             }

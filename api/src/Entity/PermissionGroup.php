@@ -14,18 +14,16 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Eine frei benannte Berechtigungsgruppe je Mandant.
+ * A freely named permission group per tenant.
  *
- * Alexander (24.08.): "das sollen z.B. Praktikant sein wo man das dann
- * einstellen kann, kunden anlegen ja usw… das man das pro bereich einstellen
- * kann". Der Name gehoert also dem Mandanten, nicht dem System — und die
- * Rechte werden Bereich fuer Bereich gesetzt, nicht als fertige Rolle
- * gewaehlt.
+ * The name belongs to the tenant, not the system — for example an intern
+ * role where only certain areas (e.g. creating customers) are enabled.
+ * Permissions are granted area by area, not chosen as a ready-made role.
  *
- * Die Rechte liegen als JSON statt in 24 Spalten: Bereiche und Stufen
- * aendern sich mit dem Funktionsumfang, eine Spalte je Kombination waere bei
- * jedem neuen Bereich eine Migration. Geprueft wird beim Setzen
- * (setRechte), sodass nie Unbekanntes in der Datenbank landet.
+ * Permissions are stored as JSON instead of in dozens of columns: areas
+ * and levels change with the feature set, and a column per combination
+ * would mean a migration for every new area. They are validated on write
+ * (setRechte), so nothing unknown ever ends up in the database.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'permission_group')]
@@ -57,9 +55,10 @@ class PermissionGroup implements TenantOwnedInterface
     private ?string $name = null;
 
     /**
-     * Rechte je Bereich: ['contacts' => ['lesen' => true, 'schreiben' =>
-     * true, 'loeschen' => false], …]. Nicht genannte Bereiche und Stufen
-     * gelten als nicht erteilt — Richtung "zu", wie ueberall im System.
+     * Permissions per area: ['contacts' => ['lesen' => true, 'schreiben' =>
+     * true, 'loeschen' => false], …]. Areas and levels that are not listed
+     * count as not granted — defaulting to "closed", as everywhere else
+     * in the system.
      *
      * @var array<string, array<string, bool>>
      */
@@ -87,11 +86,11 @@ class PermissionGroup implements TenantOwnedInterface
     public function getRechte(): array { return $this->rechte; }
 
     /**
-     * Nimmt nur bekannte Bereiche und Stufen an und wirft alles andere weg.
+     * Accepts only known areas and levels and discards everything else.
      *
-     * Ohne diese Pruefung koennte ein Client beliebige Schluessel schreiben;
-     * sie stuenden dann in der Datenbank, ohne je zu wirken — und beim
-     * naechsten Lesen sieht es aus, als waere ein Recht erteilt.
+     * Without this check a client could write arbitrary keys; they would
+     * sit in the database without ever taking effect — and on the next
+     * read it would look as if a permission had been granted.
      *
      * @param array<string, array<string, bool>> $rechte
      */
@@ -117,9 +116,9 @@ class PermissionGroup implements TenantOwnedInterface
     }
 
     /**
-     * Uebersetzt die Schalter in die Rechte-Schluessel, mit denen das ganze
-     * System schon arbeitet (`contacts.view` …). Dadurch muss keine der 32
-     * security-Angaben in den Entities angefasst werden.
+     * Translates the toggles into the permission keys the rest of the
+     * system already works with (`contacts.view` …). This means none of
+     * the security expressions across the entities need to be touched.
      *
      * @return list<string>
      */

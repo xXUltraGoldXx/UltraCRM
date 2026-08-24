@@ -17,11 +17,11 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Ein Verkaufsvorgang.
+ * A sales deal.
  *
- * Der Wert liegt als DECIMAL in der Datenbank und wird als String
- * uebertragen — Geldbetraege gehoeren nicht in einen Float, sonst summieren
- * sich Rundungsfehler ueber die Pipeline auf.
+ * The value is stored as DECIMAL in the database and transferred as a
+ * string — money does not belong in a float, or rounding errors would
+ * accumulate across the pipeline.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'deal')]
@@ -43,12 +43,12 @@ use Symfony\Component\Validator\Constraints as Assert;
 class Deal implements TenantOwnedInterface
 {
     /**
-     * Die Phasen der Erstausstattung. Sie sind kein fester Bestandteil des
-     * Modells mehr, sondern nur noch die Vorlage, mit der ein neuer Mandant
-     * startet — jeder Mandant kann sie danach umbenennen, ergaenzen oder
-     * durch eigene Pipelines ersetzen.
+     * The default starter stages. They are no longer a fixed part of the
+     * model, only the template a new tenant starts with — every tenant
+     * can rename, extend, or replace them with their own pipelines
+     * afterwards.
      *
-     * @var array<string, string> Name => Art
+     * @var array<string, string> Name => kind
      */
     public const START_PHASEN = [
         'Neu' => Stage::OFFEN,
@@ -87,7 +87,7 @@ class Deal implements TenantOwnedInterface
     #[Groups(['deal:read', 'deal:write'])]
     private ?Stage $stage = null;
 
-    /** Reihenfolge innerhalb der Phase (Kanban-Sortierung). */
+    /** Order within the stage (Kanban sort order). */
     #[ORM\Column]
     #[Groups(['deal:read', 'deal:write'])]
     private int $position = 0;
@@ -112,14 +112,14 @@ class Deal implements TenantOwnedInterface
     private ?\DateTimeImmutable $expectedCloseAt = null;
 
     /**
-     * Grund bei "verloren". Ohne Begruendung lernt niemand etwas aus einem
-     * verlorenen Vorgang, deshalb ist sie dort Pflicht (siehe validate()).
+     * Reason when "lost". Without a reason nobody learns anything from a
+     * lost deal, so it is required in that case (see validate()).
      */
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['deal:read', 'deal:write'])]
     private ?string $lostReason = null;
 
-    /** Werte der Zusatzfelder, geprueft gegen CustomFieldDefinition. */
+    /** Values of the custom fields, validated against CustomFieldDefinition. */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['deal:read', 'deal:write'])]
     private ?array $customData = null;
@@ -150,12 +150,12 @@ class Deal implements TenantOwnedInterface
     #[Groups(['deal:read'])]
     public function isOpen(): bool
     {
-        // Ohne Phase gilt ein Vorgang als offen — sonst wuerde ein
-        // unvollstaendiger Datensatz stillschweigend als abgeschlossen zaehlen.
+        // Without a stage a deal counts as open — otherwise an incomplete
+        // record would silently count as closed.
         return $this->stage === null || $this->stage->istOffen();
     }
 
-    /** Name der Phase, damit Listen ihn ohne zweiten Abruf anzeigen koennen. */
+    /** Name of the stage, so lists can display it without a second request. */
     #[Groups(['deal:read'])]
     public function getStageName(): ?string
     {
@@ -176,7 +176,7 @@ class Deal implements TenantOwnedInterface
     public function setStage(?Stage $v): static
     {
         $this->stage = $v;
-        // Abschlusszeitpunkt mitfuehren, ohne dass der Client daran denken muss.
+        // Track the close timestamp without requiring the client to think about it.
         $this->closedAt = ($v !== null && !$v->istOffen())
             ? ($this->closedAt ?? new \DateTimeImmutable())
             : null;

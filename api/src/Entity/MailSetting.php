@@ -13,15 +13,16 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Versandweg eines Mandanten. Jeder hinterlegt seinen eigenen — bewusst in
- * der Anwendung einstellbar statt fest in der .env, damit ein Mandant nicht
- * ueber den Versand eines anderen mailt.
+ * A tenant's mail delivery setup. Each tenant maintains its own —
+ * deliberately configurable in the application rather than fixed in the
+ * .env, so one tenant can't send mail through another's setup.
  *
- * Mailjet laeuft ueber deren SMTP-Zugang (in-v3.mailjet.com:587, API-Key als
- * Benutzer, Secret als Passwort) — dafuer braucht es kein eigenes Paket.
+ * Mailjet works through their SMTP access (in-v3.mailjet.com:587, API key
+ * as username, secret as password) — no dedicated package is needed for
+ * that.
  *
- * Passwort/Secret werden verschluesselt abgelegt und NIE ausgeliefert; die
- * API gibt nur zurueck, OB etwas hinterlegt ist.
+ * Password/secret are stored encrypted and NEVER returned; the API only
+ * reports WHETHER something is stored.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'mail_setting')]
@@ -65,11 +66,11 @@ class MailSetting implements TenantOwnedInterface
     #[Groups(['mail:read', 'mail:write'])]
     private ?string $username = null;
 
-    /** Verschluesselt. Kein Lese-Group — verlaesst die API nie. */
+    /** Encrypted. No read group — never leaves the API. */
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $secret = null;
 
-    /** Nur zum Setzen; wird verschluesselt in $secret abgelegt. */
+    /** Write-only; stored encrypted in $secret. */
     #[Groups(['mail:write'])]
     private ?string $plainSecret = null;
 
@@ -88,7 +89,7 @@ class MailSetting implements TenantOwnedInterface
     #[Groups(['mail:read', 'mail:write'])]
     private bool $active = true;
 
-    /** Zeigt der Oberflaeche, ob ein Passwort hinterlegt ist — ohne es zu nennen. */
+    /** Tells the UI whether a password is stored — without revealing it. */
     #[Groups(['mail:read'])]
     public function isSecretSet(): bool
     {

@@ -3,17 +3,16 @@
 namespace App\Service;
 
 /**
- * Verschluesselt Zugangsdaten, die in der Datenbank liegen muessen
- * (SMTP-Passwoerter, API-Schluessel).
+ * Encrypts credentials that have to be stored in the database (SMTP
+ * passwords, API keys).
  *
- * Warum ueberhaupt: Ein Mandanten-Admin darf sein eigenes Passwort setzen,
- * aber niemand — auch kein Datenbank-Leser — soll es hinterher im Klartext
- * sehen. Verschluesselt statt gehasht, weil der Wert zum Versenden wieder
- * gebraucht wird.
+ * Why this exists at all: a tenant admin may set their own password, but
+ * nobody afterwards — not even someone reading the database directly —
+ * should see it in plain text. Encrypted rather than hashed, because the
+ * value is needed again to actually send mail.
  *
- * Schluessel wird aus APP_SECRET abgeleitet. Faellt APP_SECRET, sind die
- * gespeicherten Zugangsdaten unlesbar — das ist gewollt und in der Doku
- * vermerkt.
+ * The key is derived from APP_SECRET. If APP_SECRET changes, the stored
+ * credentials become unreadable — that is intentional and documented.
  */
 final class SecretBox
 {
@@ -21,7 +20,7 @@ final class SecretBox
 
     public function __construct(string $appSecret)
     {
-        // sodium erwartet exakt 32 Byte.
+        // sodium expects exactly 32 bytes.
         $this->key = hash('sha256', 'mail-secret|' . $appSecret, true);
     }
 
@@ -52,8 +51,8 @@ final class SecretBox
 
         $klartext = sodium_crypto_secretbox_open($chiffre, $nonce, $this->key);
 
-        // Falsch entschluesselt heisst: falscher Schluessel oder manipulierte
-        // Daten. Beides darf nicht still als leeres Passwort durchgehen.
+        // A decryption failure means either the wrong key or tampered
+        // data. Neither should silently pass through as an empty password.
         return $klartext === false ? null : $klartext;
     }
 }
