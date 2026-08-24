@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Activity;
+use App\Entity\ChangeLog;
 use App\Entity\Contact;
 use App\Entity\Deal;
 use App\Entity\DeletionLog;
@@ -48,6 +49,13 @@ final class PrivacyController extends AbstractController
 
         $aktivitaeten = $this->em->getRepository(Activity::class)->findBy(['contact' => $kontakt]);
         $vorgaenge = $this->em->getRepository(Deal::class)->findBy(['contact' => $kontakt]);
+        // Auch die Aenderungen gehoeren in die Auskunft: "Was wurde mit
+        // meinen Daten gemacht?" ist die Frage hinter Art. 15, und sie laesst
+        // sich ohne Historie nicht beantworten.
+        $aenderungen = $this->em->getRepository(ChangeLog::class)->findBy(
+            ['subjectType' => 'contact', 'subjectId' => $kontakt->getId()],
+            ['changedAt' => 'DESC'],
+        );
 
         $daten = [
             'auskunftErstelltAm' => (new \DateTimeImmutable())->format(\DATE_ATOM),
@@ -85,6 +93,13 @@ final class PrivacyController extends AbstractController
                 'erledigt' => $a->isDone(),
                 'erfasstAm' => $a->getCreatedAt()->format(\DATE_ATOM),
             ], $aktivitaeten),
+            'aenderungen' => array_map(static fn (ChangeLog $c) => [
+                'feld' => $c->getField(),
+                'vorher' => $c->getOldValue(),
+                'nachher' => $c->getNewValue(),
+                'geaendertVon' => $c->getChangedBy(),
+                'geaendertAm' => $c->getChangedAt()->format(\DATE_ATOM),
+            ], $aenderungen),
             'vorgaenge' => array_map(static fn (Deal $d) => [
                 'titel' => $d->getTitle(),
                 'wert' => $d->getValue(),
@@ -134,6 +149,14 @@ final class PrivacyController extends AbstractController
         $aktivitaeten = $this->em->getRepository(Activity::class)->findBy(['contact' => $kontakt]);
         $vorgaenge = $this->em->getRepository(Deal::class)->findBy(['contact' => $kontakt]);
 
+        // Das Aenderungsprotokoll enthaelt alte und neue Feldwerte, also
+        // Personendaten (frueherer Name, alte Telefonnummer). Es MUSS
+        // mitgeloescht werden — sonst stuende der Name nach der "Loeschung"
+        // weiter im Protokoll und die Loeschung waere keine.
+        $protokolleintraege = $this->em->getRepository(ChangeLog::class)->findBy(
+            ['subjectType' => 'contact', 'subjectId' => $kontakt->getId()],
+        );
+
         // Pseudonym: erlaubt spaeter die Zuordnung einer Anfrage, gibt aber
         // die geloeschten Daten nicht preis.
         $pseudonym = substr(hash('sha256', $id . '|' . ($mandant?->getId() ?? 0) . '|' . $this->appSecret), 0, 32);
@@ -144,12 +167,16 @@ final class PrivacyController extends AbstractController
             $pseudonym,
             mb_substr($grund, 0, 200),
             $benutzer instanceof User ? $benutzer->getUsername() : null,
-            count($aktivitaeten) + count($vorgaenge),
+            count($aktivitaeten) + count($vorgaenge) + count($protokolleintraege),
         );
         $protokoll->setTenant($mandant);
 
         foreach ($aktivitaeten as $a) {
             $this->em->remove($a);
+        }
+
+        foreach ($protokolleintraege as $c) {
+            $this->em->remove($c);
         }
         // Vorgaenge bleiben als Geschaeftsvorfall bestehen, verlieren aber
         // den Personenbezug — Buchhaltungspflichten und Loeschanspruch
