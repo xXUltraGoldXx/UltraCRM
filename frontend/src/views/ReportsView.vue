@@ -1,0 +1,109 @@
+<script setup>
+import { computed, onMounted, ref } from 'vue';
+import api from '../api';
+import UiCard from '../components/ui/UiCard.vue';
+import { QUELLE } from '../labels.js';
+import { geldOhneDezimal as geld } from '../format.js';
+
+const bericht = ref(null);
+const fehler = ref('');
+
+onMounted(async () => {
+    try {
+        const { data } = await api.get('/reports/summary');
+        bericht.value = data;
+    } catch (e) {
+        fehler.value = 'Die Auswertung konnte nicht geladen werden.';
+    }
+});
+
+// Bar width relative to the largest stage — no charting library used.
+const maxFunnel = computed(() => Math.max(1, ...(bericht.value?.funnel ?? []).map((f) => f.anzahl)));
+const maxQuelle = computed(() => Math.max(1, ...(bericht.value?.quellen ?? []).map((q) => q.anzahl)));
+
+// The pipeline label is only shown when the funnel actually contains
+// multiple pipelines — with just one pipeline it would be redundant.
+const mehrerePipelines = computed(() => new Set((bericht.value?.funnel ?? []).map((f) => f.pipeline)).size > 1);
+</script>
+
+<template>
+    <div class="stack">
+        <header>
+            <h2 class="t-large-title">Auswertung</h2>
+            <p class="t-subhead">Woher die Kontakte kommen und wo die Vorgänge stehen.</p>
+        </header>
+
+        <p v-if="fehler" class="t-footnote fehler">{{ fehler }}</p>
+
+        <template v-if="bericht">
+            <div class="grid kennzahl-grid">
+                <UiCard>
+                    <p class="t-caption">Offener Pipeline-Wert</p>
+                    <p class="t-large-title num">{{ geld.format(bericht.kennzahlen.offenerWert) }}</p>
+                    <p class="t-footnote">{{ bericht.kennzahlen.offeneVorgaenge }} Vorgänge</p>
+                </UiCard>
+                <UiCard>
+                    <p class="t-caption">Gewonnen</p>
+                    <p class="t-large-title num">{{ geld.format(bericht.kennzahlen.gewonnenerWert) }}</p>
+                    <p class="t-footnote">
+                        <template v-if="bericht.kennzahlen.abschlussquote !== null">
+                            {{ bericht.kennzahlen.abschlussquote }} % Abschlussquote
+                        </template>
+                        <template v-else>noch kein Vorgang abgeschlossen</template>
+                    </p>
+                </UiCard>
+                <UiCard>
+                    <p class="t-caption">Kontakte</p>
+                    <p class="t-large-title num">{{ bericht.kennzahlen.kontakte }}</p>
+                    <p class="t-footnote">{{ bericht.kennzahlen.kontaktierbar }} mit Einwilligung</p>
+                </UiCard>
+            </div>
+
+            <UiCard>
+                <p class="t-caption">Vorgänge je Phase</p>
+                <div v-for="f in bericht.funnel" :key="`${f.pipeline}-${f.phase}`" class="zeile">
+                    <span class="label t-subhead">
+                        {{ f.phase }}
+                        <span v-if="mehrerePipelines" class="pipeline t-footnote muted">{{ f.pipeline }}</span>
+                    </span>
+                    <span class="balken" :style="{ width: `${(f.anzahl / maxFunnel) * 100}%` }"
+                          :class="{ 'balken--leer': !f.anzahl }" />
+                    <span class="wert t-footnote">{{ f.anzahl }} · {{ geld.format(f.wert) }}</span>
+                </div>
+            </UiCard>
+
+            <UiCard>
+                <p class="t-caption">Herkunft der Kontakte</p>
+                <div v-for="q in bericht.quellen" :key="q.quelle" class="zeile">
+                    <span class="label t-subhead">{{ QUELLE[q.quelle] || q.quelle }}</span>
+                    <span class="balken balken--alt" :style="{ width: `${(q.anzahl / maxQuelle) * 100}%` }" />
+                    <span class="wert t-footnote">{{ q.anzahl }}</span>
+                </div>
+                <p v-if="!bericht.quellen.length" class="t-footnote muted">Noch keine Kontakte erfasst.</p>
+            </UiCard>
+        </template>
+    </div>
+</template>
+
+<style scoped>
+header p { margin: var(--sp-1) 0 0; }
+.num { margin: var(--sp-2) 0 var(--sp-1); font-variant-numeric: tabular-nums; }
+.t-caption { margin: 0 0 var(--sp-4); }
+p { margin: 0; }
+
+.zeile { display: grid; grid-template-columns: 130px 1fr 150px; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; }
+.label { color: var(--label-secondary); }
+.pipeline { display: block; }
+.balken {
+    height: 10px;
+    min-width: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    transition: width .4s ease;
+}
+.balken--alt { background: var(--success); }
+.balken--leer { background: var(--fill-tertiary); }
+.wert { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 700px) { .zeile { grid-template-columns: 100px 1fr 90px; } }
+</style>

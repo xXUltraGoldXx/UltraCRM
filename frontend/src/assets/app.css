@@ -1,0 +1,170 @@
+/* ============================================================
+   UltraCRM — Design-System
+   Orientierung: Apple Human Interface Guidelines.
+   Grundsaetze: semantische Farben statt Rohwerte im Markup,
+   8px-Raster, SF-Typo-Skala, native Eckenradien, Zurueckhaltung.
+   ============================================================ */
+
+:root {
+    /* --- Typografie: San-Francisco-Skala ------------------------------ */
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+               "Inter", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+    --text-large-title: 2.125rem;  /* 34 */
+    --text-title-1:     1.75rem;   /* 28 */
+    --text-title-2:     1.375rem;  /* 22 */
+    --text-title-3:     1.25rem;   /* 20 */
+    --text-headline:    1.0625rem; /* 17 semibold */
+    --text-body:        1.0625rem; /* 17 */
+    --text-subhead:     0.9375rem; /* 15 */
+    --text-footnote:    0.8125rem; /* 13 */
+    --text-caption:     0.75rem;   /* 12 */
+
+    --leading-tight: 1.2;
+    --leading-normal: 1.45;
+
+    /* --- Raster: 8px ------------------------------------------------- */
+    --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-14: 56px;
+
+    /* --- Radien: iOS-nah --------------------------------------------- */
+    --radius-s: 8px;
+    --radius-m: 12px;
+    --radius-l: 16px;
+    --radius-xl: 22px;
+    --radius-pill: 980px;
+
+    /* --- Farben: Light ------------------------------------------------ */
+    --bg-base:        #ffffff;
+    --bg-grouped:     #f2f2f7;
+    --bg-elevated:    #ffffff;
+    --bg-input:       #ffffff;
+    --fill-quaternary: rgba(116, 116, 128, 0.08);
+    --fill-tertiary:   rgba(116, 116, 128, 0.12);
+
+    --label-primary:   #1c1c1e;
+    --label-secondary: rgba(60, 60, 67, 0.62);
+    --label-tertiary:  rgba(60, 60, 67, 0.38);
+    --separator:       rgba(60, 60, 67, 0.20);
+
+    --accent:          #0071e3;
+    --accent-hover:    #0077ed;
+    --accent-quiet:    rgba(0, 113, 227, 0.10);
+    --success:         #248a3d;
+    --warning:         #b25000;
+    --danger:          #d70015;
+
+    --nav-blur: saturate(180%) blur(20px);
+    --nav-bg: rgba(255, 255, 255, 0.72);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+    --overlay-scrim: rgba(0,0,0,.45);
+}
+
+/* --- Farben: Dark (kraeftig, hoher Kontrast) -------------------------- */
+:root[data-theme="dark"] {
+    --bg-base:        #000000;
+    --bg-grouped:     #0b0b0d;
+    --bg-elevated:    #1c1c1e;
+    --bg-input:       #1c1c1e;
+    --fill-quaternary: rgba(118, 118, 128, 0.18);
+    --fill-tertiary:   rgba(118, 118, 128, 0.26);
+
+    --label-primary:   #f5f5f7;
+    --label-secondary: rgba(235, 235, 245, 0.62);
+    --label-tertiary:  rgba(235, 235, 245, 0.36);
+    --separator:       rgba(84, 84, 88, 0.55);
+
+    --accent:          #0a84ff;
+    --accent-hover:    #3a9bff;
+    --accent-quiet:    rgba(10, 132, 255, 0.16);
+    --success:         #30d158;
+    --warning:         #ff9f0a;
+    --danger:          #ff453a;
+
+    --nav-bg: rgba(20, 20, 22, 0.72);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+    --overlay-scrim: rgba(0,0,0,.6);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #app { height: 100%; }
+
+body {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: var(--text-body);
+    line-height: var(--leading-normal);
+    color: var(--label-primary);
+    background: var(--bg-grouped);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 { margin: 0; line-height: var(--leading-tight); letter-spacing: -0.01em; }
+.t-large-title { font-size: var(--text-large-title); font-weight: 700; letter-spacing: -0.022em; }
+.t-title-1 { font-size: var(--text-title-1); font-weight: 700; letter-spacing: -0.02em; }
+.t-title-2 { font-size: var(--text-title-2); font-weight: 650; letter-spacing: -0.016em; }
+.t-title-3 { font-size: var(--text-title-3); font-weight: 600; }
+.t-headline { font-size: var(--text-headline); font-weight: 600; }
+.t-body { font-size: var(--text-body); font-weight: 400; }
+.t-subhead { font-size: var(--text-subhead); color: var(--label-secondary); }
+.t-footnote { font-size: var(--text-footnote); color: var(--label-secondary); }
+.t-caption {
+    font-size: var(--text-caption);
+    color: var(--label-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible {
+    outline: 3px solid var(--accent-quiet);
+    outline-offset: 2px;
+    border-radius: var(--radius-s);
+}
+
+::selection { background: var(--accent-quiet); }
+
+/* Reduzierte Bewegung respektieren — HIG-Grundsatz */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+    }
+}
+
+.stack { display: flex; flex-direction: column; gap: var(--sp-4); }
+.row { display: flex; align-items: center; gap: var(--sp-3); }
+.spacer { flex: 1; }
+.muted { color: var(--label-secondary); }
+
+.fehler { color: var(--danger); }
+.ok { color: var(--success); }
+.tight { gap: 2px; }
+.zurueck { align-self: flex-start; }
+.drehen { transform: rotate(180deg); }
+
+.kennzahl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--sp-4); }
+
+@media (max-width: 700px) {
+    .kennzahl-grid { grid-template-columns: 1fr; gap: var(--sp-2); }
+    /* Hier steht bewusst KEIN :deep() — das ist Vue-Syntax fuer scoped
+       styles einer Komponente. In dieser globalen Datei ist es ungueltiges
+       CSS, der Browser verwirft die Regel stillschweigend (im Test genau so
+       passiert: die Karten blieben auf dem Handy hoch). */
+    .kennzahl-grid .card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        row-gap: 2px;
+        padding: var(--sp-4);
+    }
+    .kennzahl-grid .card .t-caption { grid-column: 1; margin: 0; }
+    .kennzahl-grid .card .num { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: var(--text-title-1); }
+    .kennzahl-grid .card .t-footnote { grid-column: 1; }
+}

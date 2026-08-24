@@ -1,0 +1,203 @@
+<?php
+
+namespace App\Entity;
+
+use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Post;
+use App\State\CustomDataProcessor;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+
+/**
+ * A sales deal.
+ *
+ * The value is stored as DECIMAL in the database and transferred as a
+ * string — money does not belong in a float, or rounding errors would
+ * accumulate across the pipeline.
+ */
+#[ORM\Entity]
+#[ORM\Table(name: 'deal')]
+#[ApiResource(
+    operations: [
+        new GetCollection(security: "is_granted('PERM', 'deals.view')"),
+        new Get(security: "is_granted('PERM', 'deals.view')"),
+        new Post(security: "is_granted('PERM', 'deals.manage')", processor: CustomDataProcessor::class),
+        new Patch(security: "is_granted('PERM', 'deals.manage')", processor: CustomDataProcessor::class),
+        new Delete(security: "is_granted('PERM', 'deals.delete')"),
+    ],
+    normalizationContext: ['groups' => ['deal:read']],
+    denormalizationContext: ['groups' => ['deal:write']],
+    order: ['position' => 'ASC', 'createdAt' => 'DESC'],
+    paginationItemsPerPage: 200,
+)]
+#[ApiFilter(SearchFilter::class, properties: ['stage' => 'exact', 'title' => 'ipartial', 'contact' => 'exact', 'company' => 'exact'])]
+#[ApiFilter(OrderFilter::class, properties: ['createdAt', 'value', 'expectedCloseAt'])]
+class Deal implements TenantOwnedInterface
+{
+    /**
+     * The default starter stages. They are no longer a fixed part of the
+     * model, only the template a new tenant starts with — every tenant
+     * can rename, extend, or replace them with their own pipelines
+     * afterwards.
+     *
+     * @var array<string, string> Name => kind
+     */
+    public const START_PHASEN = [
+        'Neu' => Stage::OFFEN,
+        'Qualifiziert' => Stage::OFFEN,
+        'Angebot' => Stage::OFFEN,
+        'Verhandlung' => Stage::OFFEN,
+        'Gewonnen' => Stage::GEWONNEN,
+        'Verloren' => Stage::VERLOREN,
+    ];
+
+    #[ORM\Id, ORM\GeneratedValue, ORM\Column]
+    #[Groups(['deal:read'])]
+    private ?int $id = null;
+
+    #[ORM\ManyToOne(targetEntity: Tenant::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    private ?Tenant $tenant = null;
+
+    #[ORM\Column(length: 180)]
+    #[Assert\NotBlank(message: 'Bitte einen Titel angeben.')]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?string $title = null;
+
+    #[ORM\Column(type: 'decimal', precision: 12, scale: 2, nullable: true)]
+    #[Assert\PositiveOrZero(message: 'Der Wert darf nicht negativ sein.')]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?string $value = null;
+
+    #[ORM\Column(length: 3)]
+    #[Groups(['deal:read', 'deal:write'])]
+    private string $currency = 'EUR';
+
+    #[ORM\ManyToOne(targetEntity: Stage::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    #[Assert\NotNull(message: 'Bitte eine Phase angeben.')]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?Stage $stage = null;
+
+    /** Order within the stage (Kanban sort order). */
+    #[ORM\Column]
+    #[Groups(['deal:read', 'deal:write'])]
+    private int $position = 0;
+
+    #[ORM\ManyToOne(targetEntity: Contact::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?Contact $contact = null;
+
+    #[ORM\ManyToOne(targetEntity: Company::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?Company $company = null;
+
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?User $owner = null;
+
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?\DateTimeImmutable $expectedCloseAt = null;
+
+    /**
+     * Reason when "lost". Without a reason nobody learns anything from a
+     * lost deal, so it is required in that case (see validate()).
+     */
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?string $lostReason = null;
+
+    /** Values of the custom fields, validated against CustomFieldDefinition. */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['deal:read', 'deal:write'])]
+    private ?array $customData = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['deal:read'])]
+    private ?\DateTimeImmutable $closedAt = null;
+
+    #[ORM\Column]
+    #[Groups(['deal:read'])]
+    private \DateTimeImmutable $createdAt;
+
+    public function __construct()
+    {
+        $this->createdAt = new \DateTimeImmutable();
+    }
+
+    #[Assert\Callback]
+    public function validate(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
+    {
+        if ($this->stage?->getArt() === Stage::VERLOREN && trim((string) $this->lostReason) === '') {
+            $context->buildViolation('Bitte kurz angeben, warum der Vorgang verloren ging.')
+                ->atPath('lostReason')
+                ->addViolation();
+        }
+    }
+
+    #[Groups(['deal:read'])]
+    public function isOpen(): bool
+    {
+        // Without a stage a deal counts as open — otherwise an incomplete
+        // record would silently count as closed.
+        return $this->stage === null || $this->stage->istOffen();
+    }
+
+    /** Name of the stage, so lists can display it without a second request. */
+    #[Groups(['deal:read'])]
+    public function getStageName(): ?string
+    {
+        return $this->stage?->getName();
+    }
+
+    public function getId(): ?int { return $this->id; }
+    public function getTenant(): ?Tenant { return $this->tenant; }
+    public function setTenant(?Tenant $tenant): static { $this->tenant = $tenant; return $this; }
+    public function getTitle(): ?string { return $this->title; }
+    public function setTitle(string $v): static { $this->title = $v; return $this; }
+    public function getValue(): ?string { return $this->value; }
+    public function setValue(?string $v): static { $this->value = $v; return $this; }
+    public function getCurrency(): string { return $this->currency; }
+    public function setCurrency(string $v): static { $this->currency = $v; return $this; }
+    public function getStage(): ?Stage { return $this->stage; }
+
+    public function setStage(?Stage $v): static
+    {
+        $this->stage = $v;
+        // Track the close timestamp without requiring the client to think about it.
+        $this->closedAt = ($v !== null && !$v->istOffen())
+            ? ($this->closedAt ?? new \DateTimeImmutable())
+            : null;
+
+        return $this;
+    }
+
+    public function getPosition(): int { return $this->position; }
+    public function setPosition(int $v): static { $this->position = $v; return $this; }
+    public function getContact(): ?Contact { return $this->contact; }
+    public function setContact(?Contact $v): static { $this->contact = $v; return $this; }
+    public function getCompany(): ?Company { return $this->company; }
+    public function setCompany(?Company $v): static { $this->company = $v; return $this; }
+    public function getOwner(): ?User { return $this->owner; }
+    public function setOwner(?User $v): static { $this->owner = $v; return $this; }
+    public function getExpectedCloseAt(): ?\DateTimeImmutable { return $this->expectedCloseAt; }
+    public function setExpectedCloseAt(?\DateTimeImmutable $v): static { $this->expectedCloseAt = $v; return $this; }
+    public function getLostReason(): ?string { return $this->lostReason; }
+    public function getCustomData(): ?array { return $this->customData; }
+    public function setCustomData(?array $v): static { $this->customData = $v; return $this; }
+    public function setLostReason(?string $v): static { $this->lostReason = $v; return $this; }
+    public function getClosedAt(): ?\DateTimeImmutable { return $this->closedAt; }
+    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+}
