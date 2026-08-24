@@ -187,6 +187,51 @@ abstract class IntegrationTestCase extends KernelTestCase
         return $kernel->handle($request);
     }
 
+    /**
+     * Anfrage mit Dateianhang (multipart/form-data). Der Import laeuft so —
+     * Datei plus ein JSON-Feld mit der Feldzuordnung im selben Request.
+     *
+     * @param array<string, string> $felder
+     */
+    protected function anfrageMitDatei(
+        string $pfad,
+        User $als,
+        string $inhalt,
+        string $dateiname = 'import.csv',
+        array $felder = [],
+    ): Response {
+        $this->em->clear();
+
+        $temp = tempnam(sys_get_temp_dir(), 'test_import_');
+        self::assertIsString($temp);
+        file_put_contents($temp, $inhalt);
+
+        $datei = new \Symfony\Component\HttpFoundation\File\UploadedFile(
+            $temp,
+            $dateiname,
+            'text/csv',
+            null,
+            true, // Testmodus: die Datei wurde nicht wirklich hochgeladen
+        );
+
+        $request = Request::create(
+            $pfad,
+            'POST',
+            $felder,
+            [],
+            ['file' => $datei],
+            ['HTTP_AUTHORIZATION' => 'Bearer ' . $this->tokenFuer($als)],
+        );
+
+        $kernel = self::$kernel instanceof KernelInterface ? self::$kernel : self::bootKernel();
+
+        try {
+            return $kernel->handle($request);
+        } finally {
+            @unlink($temp);
+        }
+    }
+
     protected function tokenFuer(User $user): string
     {
         return self::getContainer()
