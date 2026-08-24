@@ -7,6 +7,8 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Entity\User;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -27,12 +29,15 @@ final class UserPasswordProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private UserPasswordHasherInterface $passwordHasher,
         private Security $security,
+        private EntityManagerInterface $em,
     ) {
     }
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
         if ($data instanceof User) {
+            $this->keineSelbstBefoerderung($data);
+
             if ($data->getPlainPassword()) {
                 $data->setPassword($this->passwordHasher->hashPassword($data, $data->getPlainPassword()));
                 $data->eraseCredentials();
@@ -50,5 +55,48 @@ final class UserPasswordProcessor implements ProcessorInterface
         }
 
         return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+    }
+
+    /**
+     * Ein Benutzer darf sich selbst bearbeiten — Anzeigename, Passwort. Rollen,
+     * Rechte, Aktiv-Schalter und Mandant gehoeren nicht dazu.
+     *
+     * Ohne diese Pruefung genuegte ein PATCH auf den eigenen Datensatz mit
+     * `{"roles": ["ROLE_ADMIN"]}`, um sich zum Administrator zu machen: die
+     * Operation erlaubt `object == user`, und beide Felder stehen in der
+     * Schreibgruppe (Analyse.md C37).
+     */
+    private function keineSelbstBefoerderung(User $data): void
+    {
+        if ($this->security->isGranted('ROLE_ADMIN')) {
+            return;
+        }
+
+        $vorher = $this->em->getUnitOfWork()->getOriginalEntityData($data);
+        if ($vorher === []) {
+            // Kein bekannter Vorzustand: das waere ein Anlegevorgang, und den
+            // laesst die Operation ohnehin nur Administratoren durch.
+            return;
+        }
+
+        $unveraenderbar = [
+            'roles' => $data->getRoles(),
+            'permissions' => $data->getPermissions(),
+            'active' => $data->isActive(),
+            'tenant' => $data->getTenant(),
+        ];
+
+        foreach ($unveraenderbar as $feld => $jetzt) {
+            if (!array_key_exists($feld, $vorher)) {
+                continue;
+            }
+
+            if ($vorher[$feld] !== $jetzt) {
+                throw new AccessDeniedHttpException(
+                    'Rollen, Rechte, Mandant und der Aktiv-Schalter lassen sich nur von einem '
+                    . 'Administrator aendern.'
+                );
+            }
+        }
     }
 }
