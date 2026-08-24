@@ -3,6 +3,9 @@ import { onMounted, ref } from 'vue';
 import api from '../api';
 import { useAuthStore } from '../stores/auth';
 import { STAGE_ART, STAGE_ART_HINWEIS } from '../labels.js';
+import { nachricht } from '../composables/nachricht.js';
+import { useVerwaltungsBlatt } from '../composables/useVerwaltungsBlatt.js';
+import { useLoeschenBestaetigung } from '../composables/useLoeschenBestaetigung.js';
 import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
@@ -37,153 +40,43 @@ async function laden() {
 }
 onMounted(laden);
 
-function nachricht(e, standard) {
-    return e?.response?.data?.detail
-        || e?.response?.data?.['hydra:description']
-        || standard;
-}
-
 /* ---------------------------------------------------------------- Pipeline */
 
-const pipelineBlattOffen = ref(false);
-const pipelineBearbeiteId = ref(null);
-const pipelineEntwurf = ref({ name: '' });
-const pipelineSpeichert = ref(false);
-const pipelineFehler = ref('');
-
-function pipelineNeu() {
-    pipelineBearbeiteId.value = null;
-    pipelineEntwurf.value = { name: '' };
-    pipelineFehler.value = '';
-    pipelineBlattOffen.value = true;
-}
-function pipelineUmbenennen(p) {
-    pipelineBearbeiteId.value = p.id;
-    pipelineEntwurf.value = { name: p.name };
-    pipelineFehler.value = '';
-    pipelineBlattOffen.value = true;
-}
-async function pipelineSpeichern() {
-    pipelineSpeichert.value = true;
-    pipelineFehler.value = '';
-    try {
-        if (pipelineBearbeiteId.value) {
-            await api.patch(`/pipelines/${pipelineBearbeiteId.value}`, { name: pipelineEntwurf.value.name }, {
-                headers: { 'Content-Type': 'application/merge-patch+json' },
-            });
-        } else {
-            await api.post('/pipelines', {
-                name: pipelineEntwurf.value.name,
-                position: pipelines.value.length + 1,
-            }, { headers: { 'Content-Type': 'application/ld+json' } });
-        }
-        pipelineBlattOffen.value = false;
-        await laden();
-    } catch (e) {
-        pipelineFehler.value = nachricht(e, 'Speichern hat nicht geklappt.');
-    } finally {
-        pipelineSpeichert.value = false;
-    }
-}
+const pipelineBlatt = useVerwaltungsBlatt('/pipelines', {
+    leererEntwurf: () => ({ name: '' }),
+    patchDaten: (entwurf) => ({ name: entwurf.name }),
+    postDaten: (entwurf) => ({ name: entwurf.name, position: pipelines.value.length + 1 }),
+    nachSpeichern: laden,
+});
 
 // Bestaetigungsblatt vor dem Loeschen — unumkehrbarer Schritt, siehe
 // Dubletten-Zusammenfuehrung fuer dasselbe Muster.
-const pipelineZumLoeschen = ref(null);
-const pipelineLoescht = ref(false);
-const pipelineLoeschenFehler = ref('');
-
-function pipelineLoeschenFragen(p) {
-    pipelineZumLoeschen.value = p;
-    pipelineLoeschenFehler.value = '';
-}
-async function pipelineLoeschenBestaetigen() {
-    pipelineLoescht.value = true;
-    pipelineLoeschenFehler.value = '';
-    try {
-        await api.delete(`/pipelines/${pipelineZumLoeschen.value.id}`);
-        pipelineZumLoeschen.value = null;
-        await laden();
-    } catch (e) {
-        // Haengen noch Vorgaenge in einer Phase dieser Pipeline, antwortet die
-        // API mit 409 und einer verstaendlichen Meldung im Feld "detail" —
-        // die zeigen wir hier direkt im Blatt, statt es kommentarlos zu schliessen.
-        pipelineLoeschenFehler.value = nachricht(e, 'Löschen hat nicht geklappt.');
-    } finally {
-        pipelineLoescht.value = false;
-    }
-}
+const pipelineLoeschen = useLoeschenBestaetigung('/pipelines', {
+    holeId: (p) => p.id,
+    nachLoeschen: laden,
+});
 
 /* -------------------------------------------------------------------- Phase */
 
-const phaseBlattOffen = ref(false);
-const phasePipelineId = ref(null);
-const phaseBearbeiteId = ref(null);
-const phaseEntwurf = ref({ name: '', art: 'offen' });
-const phaseSpeichert = ref(false);
-const phaseFehler = ref('');
+const phaseBlatt = useVerwaltungsBlatt('/stages', {
+    leererEntwurf: () => ({ name: '', art: 'offen' }),
+    patchDaten: (entwurf) => ({ name: entwurf.name, art: entwurf.art }),
+    postDaten: (entwurf, pipelineId) => {
+        const pipeline = pipelines.value.find((p) => p.id === pipelineId);
+        return {
+            name: entwurf.name,
+            art: entwurf.art,
+            pipeline: `/api/pipelines/${pipelineId}`,
+            position: (pipeline?.stages.length ?? 0) + 1,
+        };
+    },
+    nachSpeichern: laden,
+});
 
-function phaseNeu(pipeline) {
-    phasePipelineId.value = pipeline.id;
-    phaseBearbeiteId.value = null;
-    phaseEntwurf.value = { name: '', art: 'offen' };
-    phaseFehler.value = '';
-    phaseBlattOffen.value = true;
-}
-function phaseBearbeiten(pipeline, phase) {
-    phasePipelineId.value = pipeline.id;
-    phaseBearbeiteId.value = phase.id;
-    phaseEntwurf.value = { name: phase.name, art: phase.art };
-    phaseFehler.value = '';
-    phaseBlattOffen.value = true;
-}
-async function phaseSpeichern() {
-    phaseSpeichert.value = true;
-    phaseFehler.value = '';
-    try {
-        if (phaseBearbeiteId.value) {
-            await api.patch(`/stages/${phaseBearbeiteId.value}`, {
-                name: phaseEntwurf.value.name,
-                art: phaseEntwurf.value.art,
-            }, { headers: { 'Content-Type': 'application/merge-patch+json' } });
-        } else {
-            const pipeline = pipelines.value.find((p) => p.id === phasePipelineId.value);
-            await api.post('/stages', {
-                name: phaseEntwurf.value.name,
-                art: phaseEntwurf.value.art,
-                pipeline: `/api/pipelines/${phasePipelineId.value}`,
-                position: (pipeline?.stages.length ?? 0) + 1,
-            }, { headers: { 'Content-Type': 'application/ld+json' } });
-        }
-        phaseBlattOffen.value = false;
-        await laden();
-    } catch (e) {
-        phaseFehler.value = nachricht(e, 'Speichern hat nicht geklappt.');
-    } finally {
-        phaseSpeichert.value = false;
-    }
-}
-
-const phaseZumLoeschen = ref(null); // { pipeline, phase }
-const phaseLoescht = ref(false);
-const phaseLoeschenFehler = ref('');
-
-function phaseLoeschenFragen(pipeline, phase) {
-    phaseZumLoeschen.value = { pipeline, phase };
-    phaseLoeschenFehler.value = '';
-}
-async function phaseLoeschenBestaetigen() {
-    phaseLoescht.value = true;
-    phaseLoeschenFehler.value = '';
-    try {
-        await api.delete(`/stages/${phaseZumLoeschen.value.phase.id}`);
-        phaseZumLoeschen.value = null;
-        await laden();
-    } catch (e) {
-        phaseLoeschenFehler.value = nachricht(e, 'Löschen hat nicht geklappt.');
-    } finally {
-        phaseLoescht.value = false;
-    }
-}
+const phaseLoeschen = useLoeschenBestaetigung('/stages', {
+    holeId: (z) => z.phase.id,
+    nachLoeschen: laden,
+});
 
 // Reihenfolge: Position mit dem Nachbarn tauschen. Kein Drag&Drop — auf dem
 // Handy ist hoch/runter zuverlaessiger zu treffen.
@@ -228,7 +121,7 @@ async function phaseVerschieben(pipeline, phase, richtung) {
                 <h2 class="t-large-title">Pipelines</h2>
                 <p class="t-subhead">Vertriebsprozesse mit ihren Phasen — je Mandant frei einstellbar.</p>
             </div>
-            <UiButton v-if="darfVerwalten()" variant="primary" @click="pipelineNeu">
+            <UiButton v-if="darfVerwalten()" variant="primary" @click="pipelineBlatt.neu()">
                 <Icon name="plus" :size="16" /> Pipeline anlegen
             </UiButton>
         </header>
@@ -254,8 +147,8 @@ async function phaseVerschieben(pipeline, phase, richtung) {
                 <p class="t-headline">{{ p.name }}</p>
                 <div class="spacer" />
                 <template v-if="darfVerwalten()">
-                    <UiButton size="sm" @click="pipelineUmbenennen(p)">Umbenennen</UiButton>
-                    <UiButton size="sm" variant="danger" @click="pipelineLoeschenFragen(p)">Löschen</UiButton>
+                    <UiButton size="sm" @click="pipelineBlatt.bearbeiten(p.id, { name: p.name })">Umbenennen</UiButton>
+                    <UiButton size="sm" variant="danger" @click="pipelineLoeschen.fragen(p)">Löschen</UiButton>
                 </template>
             </div>
 
@@ -281,53 +174,53 @@ async function phaseVerschieben(pipeline, phase, richtung) {
                 <UiBadge :tone="ART_TON[s.art]">{{ STAGE_ART[s.art] }}</UiBadge>
                 <div class="spacer" />
                 <template v-if="darfVerwalten()">
-                    <UiButton size="sm" @click="phaseBearbeiten(p, s)">Bearbeiten</UiButton>
-                    <UiButton size="sm" variant="danger" @click="phaseLoeschenFragen(p, s)">Löschen</UiButton>
+                    <UiButton size="sm" @click="phaseBlatt.bearbeiten(s.id, { name: s.name, art: s.art }, p.id)">Bearbeiten</UiButton>
+                    <UiButton size="sm" variant="danger" @click="phaseLoeschen.fragen({ pipeline: p, phase: s })">Löschen</UiButton>
                 </template>
             </div>
 
-            <UiButton v-if="darfVerwalten()" class="phase__anlegen" @click="phaseNeu(p)">
+            <UiButton v-if="darfVerwalten()" class="phase__anlegen" @click="phaseBlatt.neu(p.id)">
                 <Icon name="plus" :size="16" /> Phase hinzufügen
             </UiButton>
         </UiCard>
 
         <!-- Pipeline anlegen / umbenennen -->
-        <UiSheet :offen="pipelineBlattOffen"
-                 :titel="pipelineBearbeiteId ? 'Pipeline umbenennen' : 'Pipeline anlegen'"
-                 bestaetigen="Speichern" :laeuft="pipelineSpeichert"
-                 @schliessen="pipelineBlattOffen = false" @bestaetigen="pipelineSpeichern">
-            <UiField v-model="pipelineEntwurf.name" label="Name" placeholder="z. B. Neukunden" />
-            <p v-if="pipelineFehler" class="t-footnote fehler">{{ pipelineFehler }}</p>
+        <UiSheet :offen="pipelineBlatt.offen"
+                 :titel="pipelineBlatt.bearbeiteId ? 'Pipeline umbenennen' : 'Pipeline anlegen'"
+                 bestaetigen="Speichern" :laeuft="pipelineBlatt.speichert"
+                 @schliessen="pipelineBlatt.offen = false" @bestaetigen="pipelineBlatt.speichern">
+            <UiField v-model="pipelineBlatt.entwurf.name" label="Name" placeholder="z. B. Neukunden" />
+            <p v-if="pipelineBlatt.fehler" class="t-footnote fehler">{{ pipelineBlatt.fehler }}</p>
         </UiSheet>
 
         <!-- Pipeline löschen -->
-        <UiSheet :offen="!!pipelineZumLoeschen" titel="Pipeline löschen"
-                 :text="pipelineZumLoeschen ? `„${pipelineZumLoeschen.name}“ wird mit allen ${pipelineZumLoeschen.stages.length} Phasen endgültig gelöscht. Das lässt sich nicht rückgängig machen.` : ''"
-                 bestaetigen="Löschen" ton="danger" :laeuft="pipelineLoescht"
-                 @schliessen="pipelineZumLoeschen = null" @bestaetigen="pipelineLoeschenBestaetigen">
-            <p v-if="pipelineLoeschenFehler" class="t-footnote fehler">{{ pipelineLoeschenFehler }}</p>
+        <UiSheet :offen="!!pipelineLoeschen.zumLoeschen" titel="Pipeline löschen"
+                 :text="pipelineLoeschen.zumLoeschen ? `„${pipelineLoeschen.zumLoeschen.name}“ wird mit allen ${pipelineLoeschen.zumLoeschen.stages.length} Phasen endgültig gelöscht. Das lässt sich nicht rückgängig machen.` : ''"
+                 bestaetigen="Löschen" ton="danger" :laeuft="pipelineLoeschen.loescht"
+                 @schliessen="pipelineLoeschen.zumLoeschen = null" @bestaetigen="pipelineLoeschen.bestaetigen">
+            <p v-if="pipelineLoeschen.fehler" class="t-footnote fehler">{{ pipelineLoeschen.fehler }}</p>
         </UiSheet>
 
         <!-- Phase anlegen / bearbeiten -->
-        <UiSheet :offen="phaseBlattOffen"
-                 :titel="phaseBearbeiteId ? 'Phase bearbeiten' : 'Phase anlegen'"
-                 bestaetigen="Speichern" :laeuft="phaseSpeichert"
-                 @schliessen="phaseBlattOffen = false" @bestaetigen="phaseSpeichern">
-            <UiField v-model="phaseEntwurf.name" label="Bezeichnung" placeholder="z. B. Angebot verschickt" />
+        <UiSheet :offen="phaseBlatt.offen"
+                 :titel="phaseBlatt.bearbeiteId ? 'Phase bearbeiten' : 'Phase anlegen'"
+                 bestaetigen="Speichern" :laeuft="phaseBlatt.speichert"
+                 @schliessen="phaseBlatt.offen = false" @bestaetigen="phaseBlatt.speichern">
+            <UiField v-model="phaseBlatt.entwurf.name" label="Bezeichnung" placeholder="z. B. Angebot verschickt" />
             <label class="feld">
                 <span class="feld__label">Art</span>
-                <UiSegmented v-model="phaseEntwurf.art" :options="ART_OPTIONEN" />
+                <UiSegmented v-model="phaseBlatt.entwurf.art" :options="ART_OPTIONEN" />
             </label>
-            <p class="t-footnote muted">{{ STAGE_ART_HINWEIS[phaseEntwurf.art] }}</p>
-            <p v-if="phaseFehler" class="t-footnote fehler">{{ phaseFehler }}</p>
+            <p class="t-footnote muted">{{ STAGE_ART_HINWEIS[phaseBlatt.entwurf.art] }}</p>
+            <p v-if="phaseBlatt.fehler" class="t-footnote fehler">{{ phaseBlatt.fehler }}</p>
         </UiSheet>
 
         <!-- Phase löschen -->
-        <UiSheet :offen="!!phaseZumLoeschen" titel="Phase löschen"
-                 :text="phaseZumLoeschen ? `„${phaseZumLoeschen.phase.name}“ wird aus „${phaseZumLoeschen.pipeline.name}“ endgültig gelöscht. Das lässt sich nicht rückgängig machen.` : ''"
-                 bestaetigen="Löschen" ton="danger" :laeuft="phaseLoescht"
-                 @schliessen="phaseZumLoeschen = null" @bestaetigen="phaseLoeschenBestaetigen">
-            <p v-if="phaseLoeschenFehler" class="t-footnote fehler">{{ phaseLoeschenFehler }}</p>
+        <UiSheet :offen="!!phaseLoeschen.zumLoeschen" titel="Phase löschen"
+                 :text="phaseLoeschen.zumLoeschen ? `„${phaseLoeschen.zumLoeschen.phase.name}“ wird aus „${phaseLoeschen.zumLoeschen.pipeline.name}“ endgültig gelöscht. Das lässt sich nicht rückgängig machen.` : ''"
+                 bestaetigen="Löschen" ton="danger" :laeuft="phaseLoeschen.loescht"
+                 @schliessen="phaseLoeschen.zumLoeschen = null" @bestaetigen="phaseLoeschen.bestaetigen">
+            <p v-if="phaseLoeschen.fehler" class="t-footnote fehler">{{ phaseLoeschen.fehler }}</p>
         </UiSheet>
     </div>
 </template>
