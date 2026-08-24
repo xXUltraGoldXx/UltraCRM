@@ -17,6 +17,7 @@ import ReportsView from '../views/ReportsView.vue';
 import TenantsView from '../views/TenantsView.vue';
 import UsersView from '../views/UsersView.vue';
 import CustomFieldsView from '../views/CustomFieldsView.vue';
+import MailSettingsView from '../views/MailSettingsView.vue';
 import DuplicatesView from '../views/DuplicatesView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 
@@ -44,6 +45,7 @@ const routes = [
             { path: 'mandanten', component: TenantsView },
             { path: 'benutzer', component: UsersView },
             { path: 'zusatzfelder', component: CustomFieldsView },
+            { path: 'versand', component: MailSettingsView },
             { path: 'dubletten', component: DuplicatesView },
         ],
     },
