@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import api from '../api';
 import UiCard from '../components/ui/UiCard.vue';
-import { PHASE, QUELLE } from '../labels.js';
+import { QUELLE } from '../labels.js';
 import { geldOhneDezimal as geld } from '../format.js';
 
 const bericht = ref(null);
@@ -20,6 +20,10 @@ onMounted(async () => {
 // Balkenbreite relativ zur groessten Phase — ohne Diagramm-Bibliothek.
 const maxFunnel = computed(() => Math.max(1, ...(bericht.value?.funnel ?? []).map((f) => f.anzahl)));
 const maxQuelle = computed(() => Math.max(1, ...(bericht.value?.quellen ?? []).map((q) => q.anzahl)));
+
+// Der Pipeline-Hinweis wird nur eingeblendet, wenn ueberhaupt mehrere
+// Pipelines im Funnel vorkommen — bei nur einer Pipeline waere er ueberfluessig.
+const mehrerePipelines = computed(() => new Set((bericht.value?.funnel ?? []).map((f) => f.pipeline)).size > 1);
 </script>
 
 <template>
@@ -57,8 +61,11 @@ const maxQuelle = computed(() => Math.max(1, ...(bericht.value?.quellen ?? []).m
 
             <UiCard>
                 <p class="t-caption">Vorgänge je Phase</p>
-                <div v-for="f in bericht.funnel" :key="f.phase" class="zeile">
-                    <span class="label t-subhead">{{ PHASE[f.phase] }}</span>
+                <div v-for="f in bericht.funnel" :key="`${f.pipeline}-${f.phase}`" class="zeile">
+                    <span class="label t-subhead">
+                        {{ f.phase }}
+                        <span v-if="mehrerePipelines" class="pipeline t-footnote muted">{{ f.pipeline }}</span>
+                    </span>
                     <span class="balken" :style="{ width: `${(f.anzahl / maxFunnel) * 100}%` }"
                           :class="{ 'balken--leer': !f.anzahl }" />
                     <span class="wert t-footnote">{{ f.anzahl }} · {{ geld.format(f.wert) }}</span>
@@ -86,6 +93,7 @@ p { margin: 0; }
 
 .zeile { display: grid; grid-template-columns: 130px 1fr 150px; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; }
 .label { color: var(--label-secondary); }
+.pipeline { display: block; }
 .balken {
     height: 10px;
     min-width: 3px;

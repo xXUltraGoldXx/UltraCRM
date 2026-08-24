@@ -12,6 +12,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Attribute\IsGranted;
@@ -43,11 +44,6 @@ final class ExportController extends AbstractController
         'formular' => 'Formular', 'telefon' => 'Telefon', 'messe' => 'Messe',
         'empfehlung' => 'Empfehlung', 'eigene_recherche' => 'Recherche',
         'import' => 'Import', 'sonstiges' => 'Sonstiges',
-    ];
-
-    private const STAGE_LABEL = [
-        'neu' => 'Neu', 'qualifiziert' => 'Qualifiziert', 'angebot' => 'Angebot',
-        'verhandlung' => 'Verhandlung', 'gewonnen' => 'Gewonnen', 'verloren' => 'Verloren',
     ];
 
     public function __construct(private readonly EntityManagerInterface $em,
@@ -196,7 +192,17 @@ final class ExportController extends AbstractController
             ->orderBy('d.createdAt', 'DESC');
 
         if ($stage = $request->query->get('stage')) {
-            $qb->andWhere('d.stage = :stage')->setParameter('stage', $stage);
+            // Gefiltert wird ueber die Id der Phase, nicht mehr ueber einen
+            // festen Schluessel wie frueher ("gewonnen"). Ein alter Aufruf
+            // wuerde durch (int) still zu 0 und lieferte eine leere, aber
+            // fehlerfrei aussehende Datei — bei einem Export ist ein stilles
+            // Falschergebnis schlimmer als ein Fehler.
+            if (!ctype_digit((string) $stage)) {
+                throw new BadRequestHttpException(
+                    'Der Filter "stage" erwartet die Id einer Phase.'
+                );
+            }
+            $qb->andWhere('d.stage = :stage')->setParameter('stage', (int) $stage);
         }
         if ($contactId = $request->query->get('contact')) {
             $qb->andWhere('kt.id = :contactId')->setParameter('contactId', $contactId);
@@ -218,7 +224,7 @@ final class ExportController extends AbstractController
                 $d->getTitle(),
                 $d->getValue(),
                 $d->getCurrency(),
-                self::STAGE_LABEL[$d->getStage()] ?? $d->getStage(),
+                $d->getStage()?->getName(),
                 $d->getContact()?->getDisplayName(),
                 $d->getCompany()?->getName(),
                 $verantwortlicher instanceof User ? $verantwortlicher->getUsername() : null,

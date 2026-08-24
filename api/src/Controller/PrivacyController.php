@@ -104,7 +104,7 @@ final class PrivacyController extends AbstractController
                 'titel' => $d->getTitle(),
                 'wert' => $d->getValue(),
                 'waehrung' => $d->getCurrency(),
-                'phase' => $d->getStage(),
+                'phase' => $d->getStage()?->getName(),
                 'abgeschlossenAm' => $d->getClosedAt()?->format(\DATE_ATOM),
             ], $vorgaenge),
         ];

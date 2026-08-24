@@ -249,7 +249,7 @@ const offeneVorgaenge = computed(() => vorgaenge.value.filter((d) => d.open));
                             <RouterLink v-for="d in vorgaenge" :key="d.id" to="/pipeline" class="vorgang">
                                 <span class="vorgang__titel">{{ d.title }}</span>
                                 <span class="t-footnote muted">
-                                    {{ d.value ? geld.format(Number(d.value)) : 'ohne Wert' }} · {{ d.stage }}
+                                    {{ d.value ? geld.format(Number(d.value)) : 'ohne Wert' }} · {{ d.stageName }}
                                 </span>
                             </RouterLink>
                             <p class="t-footnote muted">{{ offeneVorgaenge.length }} davon offen</p>

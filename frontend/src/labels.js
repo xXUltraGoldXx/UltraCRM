@@ -47,11 +47,17 @@ export const SICHERHEIT_LABEL = {
     moeglich: 'Möglich',
 };
 
-export const PHASE = {
-    neu: 'Neu',
-    qualifiziert: 'Qualifiziert',
-    angebot: 'Angebot',
-    verhandlung: 'Verhandlung',
+// Art einer Pipeline-Phase (Stage.art) — entscheidet, ob ein Vorgang darin
+// als offen, gewonnen oder verloren zaehlt. Die Namen der Phasen selbst
+// kommen seit A5 aus der Datenbank und stehen nicht mehr hier.
+export const STAGE_ART = {
+    offen: 'Offen',
     gewonnen: 'Gewonnen',
     verloren: 'Verloren',
+};
+
+export const STAGE_ART_HINWEIS = {
+    offen: 'Ein Vorgang in dieser Phase zählt in der Auswertung als offen.',
+    gewonnen: 'Ein Vorgang in dieser Phase zählt als gewonnen — unabhängig davon, wie die Phase heißt.',
+    verloren: 'Ein Vorgang in dieser Phase zählt als verloren — unabhängig davon, wie die Phase heißt.',
 };

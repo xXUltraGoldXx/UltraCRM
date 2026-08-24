@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import api from '../api';
 import { useAuthStore } from '../stores/auth';
 import Icon from '../components/Icon.vue';
@@ -10,41 +10,50 @@ import UiSegmented from '../components/ui/UiSegmented.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
 import { geld } from '../format.js';
 
-const PHASEN = [
-    { key: 'neu', label: 'Neu' },
-    { key: 'qualifiziert', label: 'Qualifiziert' },
-    { key: 'angebot', label: 'Angebot' },
-    { key: 'verhandlung', label: 'Verhandlung' },
-    { key: 'gewonnen', label: 'Gewonnen' },
-    { key: 'verloren', label: 'Verloren' },
-];
+// Phase eines Vorgangs als IRI fuer POST/PATCH — die API erwartet
+// {"stage": "/api/stages/<id>"}.
+function iri(phase) {
+    return `/api/stages/${phase.id}`;
+}
 
 const auth = useAuthStore();
 const deals = ref([]);
 const zusatzfelder = ref([]);
+const pipelines = ref([]);
+const pipelineId = ref(null);
+const phasen = ref([]);
 const laedt = ref(true);
 const fehler = ref('');
 const formOffen = ref(false);
 const speichert = ref(false);
 const formFehler = ref('');
-const entwurf = ref({ title: '', value: '', stage: 'neu' });
+const entwurf = ref({ title: '', value: '', stage: '' });
 const ziehtId = ref(null);
-// Auf schmalen Bildschirmen wird eine Phase zur Zeit gezeigt; sechs Spalten
+// Auf schmalen Bildschirmen wird eine Phase zur Zeit gezeigt; mehrere Spalten
 // nebeneinander sind auf dem Handy nicht bedienbar.
-const mobilPhase = ref('neu');
+const mobilPhase = ref(null);
 const istSchmal = ref(window.matchMedia('(max-width: 820px)').matches);
 window.matchMedia('(max-width: 820px)').addEventListener('change', (e) => { istSchmal.value = e.matches; });
 
 async function laden() {
     laedt.value = true;
     try {
-        const [d, z] = await Promise.all([
+        const [p, d, z] = await Promise.all([
+            api.get('/pipelines'),
             api.get('/deals'),
             api.get('/custom_field_definitions', { params: { entityType: 'deal' } }),
         ]);
+        pipelines.value = (p.data['hydra:member'] ?? p.data.member ?? [])
+            .slice()
+            .sort((a, b) => a.position - b.position);
         deals.value = d.data['hydra:member'] ?? d.data.member ?? [];
         zusatzfelder.value = (z.data['hydra:member'] ?? z.data.member ?? [])
             .filter((x) => x.entityType === 'deal');
+        // Auswahl beibehalten, wenn die Pipeline noch existiert — sonst die
+        // mit der niedrigsten position vorauswaehlen.
+        if (!pipelines.value.some((pl) => pl.id === pipelineId.value)) {
+            pipelineId.value = pipelines.value[0]?.id ?? null;
+        }
         fehler.value = '';
     } catch (e) {
         fehler.value = 'Die Vorgänge konnten nicht geladen werden.';
@@ -53,6 +62,34 @@ async function laden() {
     }
 }
 onMounted(laden);
+
+async function ladePhasen() {
+    if (!pipelineId.value) { phasen.value = []; return; }
+    try {
+        const { data } = await api.get('/stages', { params: { pipeline: `/api/pipelines/${pipelineId.value}` } });
+        phasen.value = (data['hydra:member'] ?? data.member ?? []).slice().sort((a, b) => a.position - b.position);
+    } catch (e) {
+        fehler.value = 'Die Phasen konnten nicht geladen werden.';
+    }
+}
+watch(pipelineId, ladePhasen);
+
+// Anlage-Formular: nur offene Phasen anbieten. Verloren-Phasen verlangen
+// serverseitig einen Verlustgrund, fuer den es im Anlage-Formular kein Feld
+// gibt — waehlbar waeren sie eine Sackgasse ohne erkennbaren Grund.
+const offenePhasen = computed(() => phasen.value.filter((p) => p.art === 'offen'));
+
+// Vorbelegung fuer neue Vorgaenge (erste offene Phase) und die Handy-
+// Spaltenauswahl (erste Phase ueberhaupt, nach position) der gerade
+// gewaehlten Pipeline setzen.
+watch(phasen, (neu) => {
+    if (!neu.length) return;
+    const ersteOffene = offenePhasen.value[0];
+    if (ersteOffene) entwurf.value.stage = iri(ersteOffene);
+    if (!neu.some((p) => p.id === mobilPhase.value)) {
+        mobilPhase.value = neu[0].id;
+    }
+});
 
 /* Export: Download über Blob, damit der Authorization-Header mitgeht — ein
    einfacher Link würde ohne Anmeldung landen (siehe PrivacyView.vue,
@@ -80,11 +117,11 @@ async function exportieren(format) {
 }
 
 const nachPhase = computed(() => Object.fromEntries(
-    PHASEN.map((p) => [p.key, deals.value.filter((d) => d.stage === p.key)]),
+    phasen.value.map((p) => [p.id, deals.value.filter((d) => d.stage?.id === p.id)]),
 ));
 
-function summe(phase) {
-    const s = (nachPhase.value[phase] || []).reduce((acc, d) => acc + Number(d.value || 0), 0);
+function summe(phaseId) {
+    const s = (nachPhase.value[phaseId] || []).reduce((acc, d) => acc + Number(d.value || 0), 0);
     return geld.format(s);
 }
 
@@ -100,7 +137,7 @@ async function speichern() {
         if (entwurf.value.value) nutzlast.value = String(entwurf.value.value);
         await api.post('/deals', nutzlast, { headers: { 'Content-Type': 'application/ld+json' } });
         formOffen.value = false;
-        entwurf.value = { title: '', value: '', stage: 'neu' };
+        entwurf.value = { title: '', value: '', stage: offenePhasen.value[0] ? iri(offenePhasen.value[0]) : '' };
         await laden();
     } catch (e) {
         formFehler.value = e?.response?.data?.['hydra:description'] || 'Speichern hat nicht geklappt.';
@@ -114,6 +151,16 @@ async function speichern() {
 const verlustBlatt = ref(null); // { deal, phase }
 const verlustGrund = ref('');
 const verlustLaeuft = ref(false);
+// Zaehler, der bei jedem Schliessen des Blatts hochgezaehlt wird. Er fliesst
+// in den :key des Handy-Auswahlfelds ein und erzwingt so dessen Neuaufbau —
+// sonst bliebe das <select> nach einem Abbruch optisch auf der eben
+// gewaehlten Verloren-Phase stehen, obwohl d.stage.id sich nie geaendert hat.
+const mobilAuswahlTick = ref(0);
+
+function verlustAbbrechen() {
+    verlustBlatt.value = null;
+    mobilAuswahlTick.value += 1;
+}
 
 async function ablegen(phase) {
     const deal = deals.value.find((d) => d.id === ziehtId.value);
@@ -122,23 +169,24 @@ async function ablegen(phase) {
 }
 
 async function verschiebe(deal, phase) {
-    if (!deal || deal.stage === phase) return;
+    if (!deal || !phase || deal.stage?.id === phase.id) return;
 
     // Verloren braucht eine Begruendung — dafuer ein richtiges Blatt statt
-    // eines Browser-Dialogs.
-    if (phase === 'verloren') {
+    // eines Browser-Dialogs. Nicht der Name, sondern die "art" der Phase
+    // entscheidet, ob es sich um den Verloren-Abschluss handelt.
+    if (phase.art === 'verloren') {
         verlustGrund.value = '';
         verlustBlatt.value = { deal, phase };
         return;
     }
-    await schreibe(deal, { stage: phase }, phase);
+    await schreibe(deal, { stage: iri(phase) }, phase);
 }
 
 async function verlustBestaetigen() {
     if (!verlustGrund.value.trim()) return;
     verlustLaeuft.value = true;
-    const { deal } = verlustBlatt.value;
-    await schreibe(deal, { stage: 'verloren', lostReason: verlustGrund.value.trim() }, 'verloren');
+    const { deal, phase } = verlustBlatt.value;
+    await schreibe(deal, { stage: iri(phase), lostReason: verlustGrund.value.trim() }, phase);
     verlustLaeuft.value = false;
     verlustBlatt.value = null;
 }
@@ -179,6 +227,13 @@ async function schreibe(deal, patch, phase) {
             </div>
         </header>
 
+        <label v-if="pipelines.length > 1" class="field pipeline-wahl">
+            <span class="field__label">Pipeline</span>
+            <select v-model="pipelineId">
+                <option v-for="pl in pipelines" :key="pl.id" :value="pl.id">{{ pl.name }}</option>
+            </select>
+        </label>
+
         <UiCard v-if="formOffen" class="form">
             <div class="form__grid">
                 <UiField v-model="entwurf.title" label="Titel" placeholder="z. B. Wartungsvertrag" />
@@ -186,7 +241,7 @@ async function schreibe(deal, patch, phase) {
                 <label class="field">
                     <span class="field__label">Phase</span>
                     <select v-model="entwurf.stage">
-                        <option v-for="p in PHASEN.slice(0, 4)" :key="p.key" :value="p.key">{{ p.label }}</option>
+                        <option v-for="p in offenePhasen" :key="p.id" :value="iri(p)">{{ p.name }}</option>
                     </select>
                 </label>
             </div>
@@ -200,17 +255,17 @@ async function schreibe(deal, patch, phase) {
         <p v-if="fehler" class="t-footnote fehler">{{ fehler }}</p>
 
         <UiSegmented v-if="istSchmal" v-model="mobilPhase" class="phasenwahl"
-                     :options="PHASEN.map((p) => ({ value: p.key, label: p.label }))" />
+                     :options="phasen.map((p) => ({ value: p.id, label: p.name }))" />
 
         <div class="board" :class="{ 'board--einzeln': istSchmal }">
-            <section v-for="p in PHASEN.filter((x) => !istSchmal || x.key === mobilPhase)" :key="p.key" class="spalte"
-                     @dragover.prevent @drop="ablegen(p.key)">
+            <section v-for="p in phasen.filter((x) => !istSchmal || x.id === mobilPhase)" :key="p.id" class="spalte"
+                     @dragover.prevent @drop="ablegen(p)">
                 <header class="spalte__kopf">
-                    <span class="t-caption">{{ p.label }}</span>
-                    <span class="t-footnote">{{ (nachPhase[p.key] || []).length }} · {{ summe(p.key) }}</span>
+                    <span class="t-caption">{{ p.name }}</span>
+                    <span class="t-footnote">{{ (nachPhase[p.id] || []).length }} · {{ summe(p.id) }}</span>
                 </header>
 
-                <article v-for="d in nachPhase[p.key]" :key="d.id" class="deal"
+                <article v-for="d in nachPhase[p.id]" :key="d.id" class="deal"
                          draggable="true" @dragstart="ziehtId = d.id">
                     <p class="deal__titel">{{ d.title }}</p>
                     <p class="t-footnote">{{ d.value ? geld.format(Number(d.value)) : 'ohne Wert' }}</p>
@@ -227,20 +282,20 @@ async function schreibe(deal, patch, phase) {
 
                     <!-- Ziehen geht auf dem Handy nicht zuverlaessig: dort
                          wechselt die Phase ueber eine Auswahl direkt auf der Karte. -->
-                    <select v-if="istSchmal" class="phasewechsel" :value="d.stage"
-                            @change="verschiebe(d, $event.target.value)">
-                        <option v-for="p2 in PHASEN" :key="p2.key" :value="p2.key">→ {{ p2.label }}</option>
+                    <select v-if="istSchmal" :key="`${d.id}-${mobilAuswahlTick}`" class="phasewechsel" :value="d.stage?.id"
+                            @change="verschiebe(d, phasen.find((p2) => String(p2.id) === $event.target.value))">
+                        <option v-for="p2 in phasen" :key="p2.id" :value="p2.id">→ {{ p2.name }}</option>
                     </select>
                 </article>
 
-                <p v-if="!(nachPhase[p.key] || []).length" class="leer t-footnote">Nichts hier</p>
+                <p v-if="!(nachPhase[p.id] || []).length" class="leer t-footnote">Nichts hier</p>
             </section>
         </div>
 
         <UiSheet :offen="!!verlustBlatt" titel="Vorgang verloren"
                  :text="`Warum ging „${verlustBlatt?.deal?.title ?? ''}“ verloren? Die Begründung hilft später beim Auswerten.`"
                  bestaetigen="Als verloren markieren" ton="danger" :laeuft="verlustLaeuft"
-                 @schliessen="verlustBlatt = null" @bestaetigen="verlustBestaetigen">
+                 @schliessen="verlustAbbrechen" @bestaetigen="verlustBestaetigen">
             <UiField v-model="verlustGrund" label="Grund" placeholder="z. B. Preis, Zeitpunkt, Mitbewerber" />
         </UiSheet>
     </div>
@@ -279,12 +334,18 @@ select {
     border-radius: var(--radius-m); padding: 11px 14px;
 }
 
+/* Nur sichtbar, wenn der Mandant mehr als eine Pipeline hat. */
+.pipeline-wahl { max-width: 280px; }
+.pipeline-wahl select { min-height: 44px; }
+
 /* Die Klasse landet auf dem Wurzelelement der Komponente — das IST bereits
-   das Segment-Element. Ein :deep()-Nachfahrenselektor liefe hier ins Leere. */
+   das Segment-Element. Ein :deep()-Nachfahrenselektor liefe hier ins Leere.
+   auto-fit statt einer festen Spaltenzahl, weil Pipelines unterschiedlich
+   viele Phasen haben koennen. */
 .phasenwahl {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     gap: 2px;
 }
 .phasenwahl :deep(button) { min-height: 40px; }
@@ -295,7 +356,7 @@ select {
     color: var(--accent); background: var(--accent-quiet);
     border: 0; border-radius: var(--radius-s); padding: 0 var(--sp-2);
 }
-.board { display: grid; grid-template-columns: repeat(6, minmax(168px, 1fr)); gap: var(--sp-3); overflow-x: auto; padding-bottom: var(--sp-2); }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--sp-3); overflow-x: auto; padding-bottom: var(--sp-2); }
 .spalte {
     display: flex; flex-direction: column; gap: var(--sp-2);
     background: var(--bg-base);
@@ -323,5 +384,5 @@ select {
 
 .leer { text-align: center; color: var(--label-tertiary); padding: var(--sp-4) 0; }
 
-@media (max-width: 1100px) { .board { grid-template-columns: repeat(6, 200px); } }
+@media (max-width: 1100px) { .board { grid-template-columns: repeat(auto-fill, 200px); } }
 </style>

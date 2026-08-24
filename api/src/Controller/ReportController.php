@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Contact;
 use App\Entity\Deal;
+use App\Entity\Stage;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,19 +34,40 @@ final class ReportController extends AbstractController
         /** @var Contact[] $kontakte */
         $kontakte = $this->em->getRepository(Contact::class)->findAll();
 
-        // Funnel: Anzahl und Wert je Phase, in fester Reihenfolge.
+        // Funnel: Anzahl und Wert je Phase, in der Reihenfolge der Pipeline.
+        // Die Phasen kommen aus der Datenbank, nicht mehr aus einer
+        // Konstante — jeder Mandant hat seine eigenen.
+        // Nach Pipeline gruppiert, innerhalb der Pipeline nach Position:
+        // sonst mischen sich bei mehreren Pipelines die Phasen mit gleicher
+        // Position ineinander und der Funnel liest sich als Durcheinander.
+        /** @var Stage[] $phasen */
+        $phasen = $this->em->createQuery(
+            'SELECT s FROM App\Entity\Stage s JOIN s.pipeline p ORDER BY p.position ASC, p.id ASC, s.position ASC'
+        )->getResult();
+
         $funnel = [];
-        foreach (Deal::STAGES as $phase) {
-            $inPhase = array_filter($deals, static fn (Deal $d) => $d->getStage() === $phase);
+        foreach ($phasen as $phase) {
+            $inPhase = array_filter(
+                $deals,
+                static fn (Deal $d) => $d->getStage()?->getId() === $phase->getId()
+            );
             $funnel[] = [
-                'phase' => $phase,
+                'phase' => $phase->getName(),
+                'pipeline' => $phase->getPipeline()?->getName(),
+                'art' => $phase->getArt(),
                 'anzahl' => count($inPhase),
                 'wert' => array_sum(array_map(static fn (Deal $d) => (float) $d->getValue(), $inPhase)),
             ];
         }
 
-        $gewonnen = array_filter($deals, static fn (Deal $d) => $d->getStage() === 'gewonnen');
-        $verloren = array_filter($deals, static fn (Deal $d) => $d->getStage() === 'verloren');
+        $gewonnen = array_filter(
+            $deals,
+            static fn (Deal $d) => $d->getStage()?->getArt() === Stage::GEWONNEN
+        );
+        $verloren = array_filter(
+            $deals,
+            static fn (Deal $d) => $d->getStage()?->getArt() === Stage::VERLOREN
+        );
         $abgeschlossen = count($gewonnen) + count($verloren);
 
         // Herkunft der Kontakte — zeigt, welcher Kanal wirklich liefert.

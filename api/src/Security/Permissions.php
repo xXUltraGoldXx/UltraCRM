@@ -20,6 +20,7 @@ final class Permissions
     public const CONTACTS_MANAGE = 'contacts.manage';
     public const DEALS_VIEW = 'deals.view';
     public const DEALS_MANAGE = 'deals.manage';
+    public const PIPELINES_MANAGE = 'pipelines.manage';
     public const ACTIVITIES_VIEW = 'activities.view';
     public const ACTIVITIES_MANAGE = 'activities.manage';
     public const LEADFORMS_MANAGE = 'leadforms.manage';
@@ -37,6 +38,7 @@ final class Permissions
         'Vertrieb' => [
             self::DEALS_VIEW => 'Vorgänge ansehen',
             self::DEALS_MANAGE => 'Vorgänge anlegen und ändern',
+            self::PIPELINES_MANAGE => 'Pipelines und Phasen einrichten',
         ],
         'Aktivitäten' => [
             self::ACTIVITIES_VIEW => 'Ansehen',
@@ -61,6 +63,7 @@ final class Permissions
     private const IMPLIZIT = [
         self::CONTACTS_MANAGE => self::CONTACTS_VIEW,
         self::DEALS_MANAGE => self::DEALS_VIEW,
+        self::PIPELINES_MANAGE => self::DEALS_VIEW,
         self::ACTIVITIES_MANAGE => self::ACTIVITIES_VIEW,
         self::PRIVACY_MANAGE => self::PRIVACY_VIEW,
     ];

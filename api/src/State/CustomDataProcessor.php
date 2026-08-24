@@ -30,6 +30,7 @@ final class CustomDataProcessor implements ProcessorInterface
         private readonly ProcessorInterface $inner,
         private readonly CustomFieldValidator $customFields,
         private readonly Security $security,
+        private readonly \App\Service\MandantReferenz $mandantReferenz,
     ) {
     }
 
@@ -40,6 +41,10 @@ final class CustomDataProcessor implements ProcessorInterface
             $data instanceof Deal => 'deal',
             default => null,
         };
+
+        if ($data instanceof Deal) {
+            $this->mandantReferenz->pruefe($data, $data->getStage(), 'Phase');
+        }
 
         if ($typ !== null && $data->getCustomData() !== null) {
             $benutzer = $this->security->getUser();

@@ -8,6 +8,7 @@ import ContactDetailView from '../views/ContactDetailView.vue';
 import CompanyDetailView from '../views/CompanyDetailView.vue';
 import CompaniesView from '../views/CompaniesView.vue';
 import PipelineView from '../views/PipelineView.vue';
+import PipelinesView from '../views/PipelinesView.vue';
 import ActivitiesView from '../views/ActivitiesView.vue';
 import LeadFormsView from '../views/LeadFormsView.vue';
 import PrivacyView from '../views/PrivacyView.vue';
@@ -34,6 +35,7 @@ const routes = [
             { path: 'firmen', component: CompaniesView },
             { path: 'firmen/:id', component: CompanyDetailView },
             { path: 'pipeline', component: PipelineView },
+            { path: 'pipelines', component: PipelinesView },
             { path: 'aktivitaeten', component: ActivitiesView },
             { path: 'formulare', component: LeadFormsView },
             { path: 'einwilligungen', component: PrivacyView },

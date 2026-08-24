@@ -34,6 +34,7 @@ const alleNav = [
     { to: '/import', icon: 'import', label: 'Import', recht: 'importexport.use' },
     { to: '/dubletten', icon: 'search', label: 'Dubletten', recht: 'contacts.view' },
     { to: '/auswertung', icon: 'pipeline', label: 'Auswertung', recht: 'reports.view' },
+    { to: '/pipelines', icon: 'settings', label: 'Pipelines', recht: 'pipelines.manage' },
 ];
 
 const nav = computed(() => alleNav.filter((n) => !n.recht || auth.darf(n.recht)));

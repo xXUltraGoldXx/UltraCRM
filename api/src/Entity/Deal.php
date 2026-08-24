@@ -42,8 +42,22 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(OrderFilter::class, properties: ['createdAt', 'value', 'expectedCloseAt'])]
 class Deal implements TenantOwnedInterface
 {
-    public const STAGES = ['neu', 'qualifiziert', 'angebot', 'verhandlung', 'gewonnen', 'verloren'];
-    public const CLOSED_STAGES = ['gewonnen', 'verloren'];
+    /**
+     * Die Phasen der Erstausstattung. Sie sind kein fester Bestandteil des
+     * Modells mehr, sondern nur noch die Vorlage, mit der ein neuer Mandant
+     * startet — jeder Mandant kann sie danach umbenennen, ergaenzen oder
+     * durch eigene Pipelines ersetzen.
+     *
+     * @var array<string, string> Name => Art
+     */
+    public const START_PHASEN = [
+        'Neu' => Stage::OFFEN,
+        'Qualifiziert' => Stage::OFFEN,
+        'Angebot' => Stage::OFFEN,
+        'Verhandlung' => Stage::OFFEN,
+        'Gewonnen' => Stage::GEWONNEN,
+        'Verloren' => Stage::VERLOREN,
+    ];
 
     #[ORM\Id, ORM\GeneratedValue, ORM\Column]
     #[Groups(['deal:read'])]
@@ -67,10 +81,11 @@ class Deal implements TenantOwnedInterface
     #[Groups(['deal:read', 'deal:write'])]
     private string $currency = 'EUR';
 
-    #[ORM\Column(length: 30)]
-    #[Assert\Choice(choices: self::STAGES, message: 'Unbekannte Phase.')]
+    #[ORM\ManyToOne(targetEntity: Stage::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    #[Assert\NotNull(message: 'Bitte eine Phase angeben.')]
     #[Groups(['deal:read', 'deal:write'])]
-    private string $stage = 'neu';
+    private ?Stage $stage = null;
 
     /** Reihenfolge innerhalb der Phase (Kanban-Sortierung). */
     #[ORM\Column]
@@ -125,7 +140,7 @@ class Deal implements TenantOwnedInterface
     #[Assert\Callback]
     public function validate(\Symfony\Component\Validator\Context\ExecutionContextInterface $context): void
     {
-        if ($this->stage === 'verloren' && trim((string) $this->lostReason) === '') {
+        if ($this->stage?->getArt() === Stage::VERLOREN && trim((string) $this->lostReason) === '') {
             $context->buildViolation('Bitte kurz angeben, warum der Vorgang verloren ging.')
                 ->atPath('lostReason')
                 ->addViolation();
@@ -135,7 +150,16 @@ class Deal implements TenantOwnedInterface
     #[Groups(['deal:read'])]
     public function isOpen(): bool
     {
-        return !in_array($this->stage, self::CLOSED_STAGES, true);
+        // Ohne Phase gilt ein Vorgang als offen — sonst wuerde ein
+        // unvollstaendiger Datensatz stillschweigend als abgeschlossen zaehlen.
+        return $this->stage === null || $this->stage->istOffen();
+    }
+
+    /** Name der Phase, damit Listen ihn ohne zweiten Abruf anzeigen koennen. */
+    #[Groups(['deal:read'])]
+    public function getStageName(): ?string
+    {
+        return $this->stage?->getName();
     }
 
     public function getId(): ?int { return $this->id; }
@@ -147,13 +171,13 @@ class Deal implements TenantOwnedInterface
     public function setValue(?string $v): static { $this->value = $v; return $this; }
     public function getCurrency(): string { return $this->currency; }
     public function setCurrency(string $v): static { $this->currency = $v; return $this; }
-    public function getStage(): string { return $this->stage; }
+    public function getStage(): ?Stage { return $this->stage; }
 
-    public function setStage(string $v): static
+    public function setStage(?Stage $v): static
     {
         $this->stage = $v;
         // Abschlusszeitpunkt mitfuehren, ohne dass der Client daran denken muss.
-        $this->closedAt = in_array($v, self::CLOSED_STAGES, true)
+        $this->closedAt = ($v !== null && !$v->istOffen())
             ? ($this->closedAt ?? new \DateTimeImmutable())
             : null;
 

@@ -8,7 +8,7 @@ import UiCard from '../components/ui/UiCard.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiSheet from '../components/ui/UiSheet.vue';
-import { ART, PHASE } from '../labels.js';
+import { ART } from '../labels.js';
 import { datum, geld } from '../format.js';
 
 /**
@@ -114,7 +114,8 @@ async function alsHauptansprechpartner(k) {
 
 const offen = computed(() => vorgaenge.value.filter((d) => d.open));
 const offenerWert = computed(() => geld.format(offen.value.reduce((s, d) => s + Number(d.value || 0), 0)));
-const gewonnen = computed(() => vorgaenge.value.filter((d) => d.stage === 'gewonnen'));
+// Nicht der Name der Phase entscheidet, sondern ihre Art (siehe A5).
+const gewonnen = computed(() => vorgaenge.value.filter((d) => d.stage?.art === 'gewonnen'));
 const gewonnenerWert = computed(() => geld.format(gewonnen.value.reduce((s, d) => s + Number(d.value || 0), 0)));
 const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactable).length);
 </script>
@@ -205,7 +206,7 @@ const mitEinwilligung = computed(() => kontakte.value.filter((k) => k.contactabl
                         <RouterLink v-for="d in vorgaenge" :key="d.id" to="/pipeline" class="person">
                             <div class="stack tight">
                                 <span class="person__name">{{ d.title }}</span>
-                                <span class="t-footnote muted">{{ PHASE[d.stage] }}</span>
+                                <span class="t-footnote muted">{{ d.stageName }}</span>
                             </div>
                             <span class="spacer" />
                             <span class="t-subhead">{{ d.value ? geld.format(Number(d.value)) : '—' }}</span>
