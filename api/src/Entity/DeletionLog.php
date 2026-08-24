@@ -21,7 +21,10 @@ use Symfony\Component\Serializer\Attribute\Groups;
 #[ORM\Entity]
 #[ORM\Table(name: 'deletion_log')]
 #[ApiResource(
-    operations: [new GetCollection()],
+    // Das Loeschprotokoll ist ein Datenschutz-Nachweis und nennt Grund und
+    // ausfuehrende Person. Es gehoert an dasselbe Recht wie das
+    // Aenderungsprotokoll — nicht an "irgendwie angemeldet" (Analyse.md C40).
+    operations: [new GetCollection(security: "is_granted('PERM', 'privacy.view')")],
     normalizationContext: ['groups' => ['deletion:read']],
     order: ['deletedAt' => 'DESC'],
 )]
