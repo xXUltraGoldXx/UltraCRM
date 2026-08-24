@@ -9,12 +9,11 @@ use App\Service\SecretBox;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Verschluesselt das im Klartext uebergebene Passwort, bevor Doctrine
- * speichert.
+ * Encrypts the plaintext password before Doctrine persists it.
  *
- * Umgesetzt als State-Processor, nicht als kernel.view-Listener: API Platform
- * schreibt ueber Processors: ein Listener haengt sich an den falschen Punkt
- * und die Aenderung kam nie in der Datenbank an (im Test aufgefallen).
+ * Implemented as a state processor, not a kernel.view listener: API
+ * Platform writes through processors, so a listener would hook into the
+ * wrong point and the change would never reach the database.
  */
 final class MailSettingProcessor implements ProcessorInterface
 {

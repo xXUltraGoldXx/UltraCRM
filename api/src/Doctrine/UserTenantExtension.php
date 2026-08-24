@@ -11,20 +11,20 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Beschraenkt Benutzer-Abfragen der API auf den eigenen Mandanten.
+ * Restricts the API's user queries to the caller's own tenant.
  *
- * `User` implementiert bewusst NICHT TenantOwnedInterface: der
- * Doctrine-Filter haengt am angemeldeten Benutzer, bei der Anmeldung gibt es
- * aber noch keinen. Waere User gefiltert, faende der Login den Benutzer nicht
- * mehr — die Anmeldung wuerde sich selbst aussperren.
+ * `User` deliberately does NOT implement TenantOwnedInterface: the
+ * Doctrine filter depends on the logged-in user, but at login time there
+ * is none yet. If User were filtered, login would no longer find the
+ * user — authentication would lock itself out.
  *
- * Dadurch waren Benutzer bislang mandantenuebergreifend sichtbar und
- * aenderbar: ein Administrator aus Mandant B konnte Benutzer aus Mandant A
- * lesen und bearbeiten, und `/users/picker` gab jedem Angemeldeten die Namen
- * aller Benutzer aller Mandanten (Analyse.md C37).
+ * As a consequence, users used to be visible and editable across
+ * tenants: an administrator in tenant B could read and edit users from
+ * tenant A, and `/users/picker` returned the names of every user of
+ * every tenant to any logged-in caller.
  *
- * Diese Erweiterung greift nur in den Abfragen von API Platform. Der
- * Anmeldeweg laeuft nicht darueber und bleibt unberuehrt.
+ * This extension only applies to API Platform queries. The login path
+ * does not go through it and is unaffected.
  */
 final class UserTenantExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
@@ -65,15 +65,15 @@ final class UserTenantExtension implements QueryCollectionExtensionInterface, Qu
             return;
         }
 
-        // Der Superadmin verwaltet die Mandanten und muss alle Benutzer sehen.
+        // The superadmin manages the tenants and must see all users.
         if (in_array('ROLE_SUPERADMIN', $angemeldet->getRoles(), true)) {
             return;
         }
 
         $alias = $queryBuilder->getRootAliases()[0];
 
-        // Ohne eigenen Mandanten wird nichts sichtbar — Richtung "zu",
-        // wie beim Mandantenfilter der uebrigen Entities.
+        // Without a tenant of their own, nothing is visible — fail
+        // closed, same as the tenant filter on the other entities.
         if ($angemeldet->getTenant() === null) {
             $queryBuilder->andWhere(sprintf('%s.id = :nur_ich', $alias))
                 ->setParameter('nur_ich', $angemeldet->getId());

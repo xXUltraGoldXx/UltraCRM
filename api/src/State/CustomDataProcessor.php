@@ -14,14 +14,15 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Prueft die Zusatzfelder von Firmen und Vorgaengen.
+ * Validates the custom fields of companies and deals.
  *
- * Beim Kontakt sitzt dieselbe Pruefung im ContactProcessor, weil der
- * zusaetzlich die Hauptkontakt-Regel haelt. Hier reicht die Pruefung allein.
+ * For contacts, the same validation lives in ContactProcessor, because
+ * that one also enforces the primary-contact rule. Here validation alone
+ * is enough.
  *
- * Wie dort gilt: Beim Anlegen hat der Datensatz noch keinen Mandanten (den
- * setzt der TenantAssignListener erst danach), deshalb der Rueckgriff auf
- * den angemeldeten Benutzer — siehe Analyse.md C14.
+ * As there: on creation the record has no tenant yet (the
+ * TenantAssignListener only sets it afterwards), hence the fallback to
+ * the logged-in user's tenant.
  */
 final class CustomDataProcessor implements ProcessorInterface
 {

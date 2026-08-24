@@ -14,16 +14,16 @@ use Doctrine\ORM\Events;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Schreibt Aenderungen an Kontakten, Firmen und Vorgaengen ins Protokoll.
+ * Records changes to contacts, companies and deals in the change log.
  *
- * Umgesetzt in onFlush statt postUpdate: nur dort steht das Changeset zur
- * Verfuegung, das Doctrine ohnehin berechnet hat — ein eigener Vergleich
- * "vorher/nachher" waere Doppelarbeit und wuerde Sonderfaelle uebersehen.
+ * Implemented in onFlush rather than postUpdate: only there is the
+ * changeset available that Doctrine has already computed — a manual
+ * "before/after" comparison would duplicate that work and miss edge
+ * cases.
  *
- * Bewusst NICHT protokolliert werden Felder, die sich technisch aendern
- * (updatedAt) oder deren Inhalt selbst schuetzenswert ist (Passwoerter,
- * Mail-Zugangsdaten) — ein Protokoll darf kein Nebenausgang fuer
- * Geheimnisse sein.
+ * Fields that change for technical reasons (updatedAt) or whose content
+ * is itself sensitive (passwords, mail credentials) are deliberately NOT
+ * logged — a change log must not become a side channel for secrets.
  */
 #[AsDoctrineListener(event: Events::onFlush)]
 final class ChangeLogSubscriber
@@ -34,7 +34,7 @@ final class ChangeLogSubscriber
         Deal::class => 'deal',
     ];
 
-    /** Felder, die nie im Protokoll landen. */
+    /** Fields that never end up in the change log. */
     private const NICHT_PROTOKOLLIEREN = [
         'password', 'plainPassword', 'secret', 'plainSecret',
         'confirmToken', 'updatedAt', 'customData',
@@ -75,8 +75,8 @@ final class ChangeLogSubscriber
                     $eintrag->setTenant($entity->getTenant());
                 }
 
-                // In onFlush muss man neue Entities selbst anmelden — ein
-                // spaeteres flush() wuerde sie sonst nicht mehr erfassen.
+                // Inside onFlush, new entities must be scheduled manually
+                // — a later flush() would no longer pick them up.
                 $em->persist($eintrag);
                 $uow->computeChangeSet($metadata, $eintrag);
             }
@@ -98,7 +98,7 @@ final class ChangeLogSubscriber
         }
 
         if (is_object($wert)) {
-            // Verknuepfungen lesbar machen statt eine Objekt-Id zu speichern.
+            // Make relations human-readable instead of storing an object id.
             foreach (['getName', 'getTitle', 'getDisplayName', 'getUsername'] as $methode) {
                 if (method_exists($wert, $methode)) {
                     return (string) $wert->$methode();

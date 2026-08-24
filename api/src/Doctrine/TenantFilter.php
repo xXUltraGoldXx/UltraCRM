@@ -7,9 +7,9 @@ use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Query\Filter\SQLFilter;
 
 /**
- * Haengt an jede Abfrage mandantengebundener Entities die Bedingung
- * tenant_id = :tenant_id an. Aktiviert wird der Filter je Request im
- * TenantFilterSubscriber; fuer Superadmins bleibt er aus.
+ * Adds the condition tenant_id = :tenant_id to every query on
+ * tenant-owned entities. Enabled per request in TenantFilterSubscriber;
+ * stays off for superadmins.
  */
 final class TenantFilter extends SQLFilter
 {

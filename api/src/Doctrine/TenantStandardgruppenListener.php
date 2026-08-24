@@ -9,11 +9,11 @@ use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Events;
 
 /**
- * Gibt jedem neuen Mandanten die vier Vorlagen mit.
+ * Gives every new tenant the four default groups.
  *
- * Dasselbe Muster wie TenantPipelineListener: prePersist ohne eigenen
- * flush() — ein flush() aus einem Listener heraus laeuft mitten im Commit
- * des laufenden UnitOfWork (Analyse.md C28).
+ * Same pattern as TenantPipelineListener: prePersist without its own
+ * flush() — a flush() from inside a listener would run in the middle of
+ * the ongoing UnitOfWork commit.
  */
 #[AsDoctrineListener(event: Events::prePersist)]
 final class TenantStandardgruppenListener

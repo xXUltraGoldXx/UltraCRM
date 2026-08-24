@@ -12,12 +12,12 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Haelt die Regel "genau ein Hauptansprechpartner je Firma" serverseitig.
+ * Enforces the rule "exactly one primary contact per company" server-side.
  *
- * Vorher stand die Regel nur im Umsetzen-Knopf der Oberflaeche: wer eine
- * Person MIT Haken anlegte, bekam einen zweiten Hauptkontakt, und mehrere
- * parallele PATCHes konnten den Stand zerreissen (Review-Befunde 72 und 48).
- * Eine Invariante gehoert an die Stelle, die niemand umgehen kann.
+ * The rule used to live only in the frontend's submit button: creating a
+ * person WITH the checkbox set produced a second primary contact, and
+ * concurrent PATCHes could tear the state apart. An invariant belongs at
+ * the one place nobody can bypass.
  */
 final class ContactProcessor implements ProcessorInterface
 {
@@ -33,14 +33,15 @@ final class ContactProcessor implements ProcessorInterface
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
         if ($data instanceof Contact && $data->getCustomData() !== null) {
-            // Zusatzfelder gegen ihre Definition pruefen, bevor irgendetwas
-            // gespeichert wird — ein freies JSON-Feld nimmt sonst alles an.
+            // Validate custom fields against their definition before
+            // anything is saved — an open JSON field otherwise accepts
+            // anything.
             //
-            // Beim Anlegen hat der Datensatz hier noch KEINEN Mandanten: den
-            // setzt der TenantAssignListener erst beim Speichern, also nach
-            // diesem Processor. Ohne den Rueckgriff auf den angemeldeten
-            // Benutzer fand die Pruefung deshalb keine Definitionen und
-            // verwarf stillschweigend alle Werte (im Test aufgefallen).
+            // On creation the record has NO tenant yet at this point: the
+            // TenantAssignListener only sets it on save, i.e. after this
+            // processor runs. Without falling back to the logged-in
+            // user's tenant, validation found no definitions and silently
+            // discarded all values.
             $benutzer = $this->security->getUser();
             $mandant = $data->getTenant()
                 ?? ($benutzer instanceof User ? $benutzer->getTenant() : null);
@@ -58,8 +59,8 @@ final class ContactProcessor implements ProcessorInterface
             return $this->inner->process($data, $operation, $uriVariables, $context);
         }
 
-        // Alles in einer Transaktion: entweder wechselt der Hauptkontakt
-        // vollstaendig, oder gar nicht.
+        // Everything in one transaction: the primary contact either
+        // switches completely, or not at all.
         return $this->em->wrapInTransaction(function () use ($data, $operation, $uriVariables, $context) {
             $qb = $this->em->createQueryBuilder()
                 ->update(Contact::class, 'c')
@@ -70,7 +71,7 @@ final class ContactProcessor implements ProcessorInterface
                 ->setParameter('an', true)
                 ->setParameter('firma', $data->getCompany());
 
-            // Beim Aendern eines bestehenden Kontakts sich selbst aussparen.
+            // Exclude the contact itself when updating an existing one.
             if ($data->getId() !== null) {
                 $qb->andWhere('c.id != :selbst')->setParameter('selbst', $data->getId());
             }

@@ -10,9 +10,9 @@ use Doctrine\ORM\Events;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Setzt beim Anlegen mandantengebundener Datensaetze automatisch den
- * Mandanten des eingeloggten Users. Clients koennen den Mandanten damit
- * weder vergessen noch faelschen — das Feld kommt nie aus dem Request.
+ * Automatically sets the logged-in user's tenant when a tenant-owned
+ * record is created. Clients can neither forget nor forge the tenant this
+ * way — the field never comes from the request.
  */
 #[AsDoctrineListener(event: Events::prePersist)]
 final class TenantAssignListener

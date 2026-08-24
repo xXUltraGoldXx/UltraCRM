@@ -11,20 +11,20 @@ use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Events;
 
 /**
- * Stattet jeden neuen Mandanten mit einer Startpipeline aus.
+ * Equips every new tenant with a starter pipeline.
  *
- * Ohne sie haette ein frisch angelegter Mandant keine einzige Phase und
- * koennte keinen Vorgang anlegen — ein leeres System, das aussieht, als
- * waere es kaputt. Der Mandant kann die Phasen danach frei aendern.
+ * Without it a freshly created tenant would have no stage at all and
+ * could not create a single deal — an empty system that looks broken.
+ * The tenant is free to change the stages afterwards.
  *
- * Bewusst als Doctrine-Listener und nicht als State-Processor: so greift es
- * auf jedem Weg, auch beim Anlegen ueber die Konsole oder in Tests.
+ * Deliberately a Doctrine listener rather than a state processor, so it
+ * applies no matter how the tenant is created — including from the
+ * console or in tests.
  *
- * Haengt an prePersist und flusht NICHT selbst. Ein flush() aus einem
- * Listener heraus laeuft mitten im Commit des laufenden UnitOfWork; Doctrine
- * nimmt hier neu angemeldete Datensaetze von sich aus im selben Durchgang
- * mit. (Review-Befund, Schwere 70 — der vorhergesagte Schaden liess sich in
- * der Probe zwar nicht ausloesen, das Muster bleibt aber unnoetig fragil.)
+ * Hooks into prePersist and does NOT call flush() itself. A flush() from
+ * inside a listener would run in the middle of the ongoing UnitOfWork
+ * commit; Doctrine already picks up newly scheduled entities in that same
+ * pass on its own, so a manual flush here would be redundant and fragile.
  */
 #[AsDoctrineListener(event: Events::prePersist)]
 final class TenantPipelineListener
@@ -48,9 +48,10 @@ final class TenantPipelineListener
                 ->setName($name)
                 ->setArt($art)
                 ->setPosition($position++);
-            // addStage() setzt die Rueckrichtung mit: sonst kennt die frisch
-            // angelegte Pipeline ihre Phasen im selben Durchgang nicht, und
-            // wer sie direkt danach ausliest, sieht eine leere Liste.
+            // addStage() also sets the inverse side: otherwise the
+            // freshly created pipeline would not know its stages within
+            // the same pass, and reading it back right after would show
+            // an empty list.
             $pipeline->addStage($phase);
             $phase->setTenant($tenant);
             $em->persist($phase);
