@@ -5,6 +5,8 @@ import Icon from '../components/Icon.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiCard from '../components/ui/UiCard.vue';
 import UiBadge from '../components/ui/UiBadge.vue';
+import UiSegmented from '../components/ui/UiSegmented.vue';
+import { SICHERHEIT_LABEL } from '../labels.js';
 
 // Reihenfolge und Beschriftung der Zielfelder — "Ignorieren" steht oben,
 // weil es der haeufigste Vorschlag fuer unbekannte Spalten ist.
@@ -19,6 +21,13 @@ const FELD_OPTIONEN = [
     { value: 'department', label: 'Abteilung' },
 ];
 const FELD_LABEL = Object.fromEntries(FELD_OPTIONEN.map((f) => [f.value, f.label]));
+
+// Entscheidung je Zeile in der Abgleich-Vorschau.
+const ENTSCHEIDUNG_OPTIONEN = [
+    { value: 'neu', label: 'Neu anlegen' },
+    { value: 'aktualisieren', label: 'Ergänzen' },
+    { value: 'ueberspringen', label: 'Überspringen' },
+];
 
 const SCHRITTE = [
     { id: 'auswahl', label: 'Datei' },
@@ -38,6 +47,15 @@ const kopf = ref([]);
 const previewRows = ref([]);
 const totalRows = ref(0);
 const mapping = ref([]);
+
+// Ergebnis von /import/preview (Abgleich gegen den Bestand) und die
+// Entscheidung des Anwenders je Zeile — Schluessel ist die Zeilennummer
+// als String, wie es /import/execute in "decisions" erwartet.
+const abgleich = ref(null);
+const entscheidungen = ref({});
+// Nur gesetzt, wenn die Vorschau tatsaechlich durchlaufen wurde — sonst
+// werden beim Uebernehmen keine decisions mitgeschickt (Punkt 7).
+const vorschauGenutzt = ref(false);
 
 const bericht = ref(null);
 
@@ -86,27 +104,56 @@ function spalteWert(zeile, feld) {
 
 const nachnameFehltIn = computed(() => previewRows.value.filter((z) => spalteWert(z, 'lastName') === '').length);
 
-const vorschauEmailAnzahl = computed(() => {
-    const m = {};
-    for (const z of previewRows.value) {
-        const e = spalteWert(z, 'email').toLowerCase();
-        if (e) m[e] = (m[e] || 0) + 1;
-    }
-    return m;
-});
-function istVorschauDuplikat(zeile) {
-    const e = spalteWert(zeile, 'email').toLowerCase();
-    return !!e && vorschauEmailAnzahl.value[e] > 1;
-}
-
 function zurZuordnung() {
     schritt.value = 'zuordnung';
 }
-function zurVorschau() {
-    schritt.value = 'vorschau';
+
+// Zeilen mit mindestens einem Treffer im Bestand stehen im Fokus der
+// Vorschau; Zeilen ohne Treffer werden laut Vorgabe nicht aufgeblaeht
+// (Punkt 5) und nur als Summe gezeigt.
+// Zu entscheiden sind Zeilen mit Bestandstreffer UND Zeilen, die schon
+// weiter oben in derselben Datei stehen — beide braucht der Anwender vor
+// Augen, der Rest waere nur Laenge.
+const zeilenMitTreffer = computed(
+    () => abgleich.value?.rows.filter((z) => z.treffer?.length || z.dateiDublette) ?? []
+);
+const zeilenOhneTreffer = computed(
+    () => abgleich.value?.rows.filter((z) => !z.treffer?.length && !z.dateiDublette) ?? []
+);
+
+function entscheidungFuer(zeile) {
+    return entscheidungen.value[zeile.row] ?? { action: zeile.vorschlag };
 }
 
-async function uebernehmen() {
+function aktionSetzen(zeile, action) {
+    const bisherige = entscheidungFuer(zeile);
+    entscheidungen.value[zeile.row] = {
+        action,
+        contactId: action === 'aktualisieren' ? (bisherige.contactId ?? zeile.treffer[0]?.id) : undefined,
+    };
+}
+
+function kontaktWaehlen(zeile, id) {
+    entscheidungen.value[zeile.row] = { action: 'aktualisieren', contactId: id };
+}
+
+// Sammelaktion: bei jeder Zeile, deren bester Treffer sicher ist (gleiche
+// E-Mail), automatisch ergaenzen statt einzeln durchklicken zu muessen.
+function alleSicherErgaenzen() {
+    for (const zeile of zeilenMitTreffer.value) {
+        if (zeile.dateiDublette) continue; // steht schon oben in der Datei
+        if (zeile.treffer[0]?.sicherheit === 'sicher') {
+            entscheidungen.value[zeile.row] = { action: 'aktualisieren', contactId: zeile.treffer[0].id };
+        }
+    }
+}
+function alleAlsNeuAnlegen() {
+    for (const zeile of abgleich.value?.rows ?? []) {
+        entscheidungen.value[zeile.row] = { action: 'neu', contactId: undefined };
+    }
+}
+
+async function zurVorschau() {
     if (!datei.value) return;
     laedt.value = true;
     fehler.value = '';
@@ -114,6 +161,40 @@ async function uebernehmen() {
         const form = new FormData();
         form.append('file', datei.value);
         form.append('mapping', JSON.stringify(mapping.value));
+        const { data } = await api.post('/import/preview', form);
+        abgleich.value = data;
+        entscheidungen.value = Object.fromEntries(
+            data.rows.map((z) => [z.row, {
+                action: z.vorschlag,
+                contactId: z.vorschlag === 'aktualisieren' ? z.treffer[0]?.id : undefined,
+            }])
+        );
+        vorschauGenutzt.value = true;
+        schritt.value = 'vorschau';
+    } catch (e) {
+        fehler.value = e.response?.data?.error || 'Die Vorschau konnte nicht geladen werden.';
+    } finally {
+        laedt.value = false;
+    }
+}
+
+async function uebernehmen(mitVorschau) {
+    if (!datei.value) return;
+    laedt.value = true;
+    fehler.value = '';
+    try {
+        const form = new FormData();
+        form.append('file', datei.value);
+        form.append('mapping', JSON.stringify(mapping.value));
+        if (mitVorschau && vorschauGenutzt.value) {
+            const decisions = Object.fromEntries(
+                Object.entries(entscheidungen.value).map(([row, e]) => [
+                    row,
+                    e.action === 'aktualisieren' ? { action: e.action, contactId: e.contactId } : { action: e.action },
+                ])
+            );
+            form.append('decisions', JSON.stringify(decisions));
+        }
         const { data } = await api.post('/import/execute', form);
         bericht.value = data;
         schritt.value = 'bericht';
@@ -130,6 +211,9 @@ function neuerImport() {
     kopf.value = [];
     previewRows.value = [];
     mapping.value = [];
+    abgleich.value = null;
+    entscheidungen.value = {};
+    vorschauGenutzt.value = false;
     bericht.value = null;
     fehler.value = '';
 }
@@ -189,58 +273,81 @@ function neuerImport() {
                 </div>
             </div>
 
-            <div class="knopfreihe">
-                <UiButton @click="schritt = 'auswahl'">Zurück</UiButton>
-                <UiButton variant="primary" @click="zurVorschau">Weiter zur Vorschau</UiButton>
-            </div>
-        </UiCard>
-
-        <!-- Schritt 3: Vorschau -->
-        <UiCard v-if="schritt === 'vorschau'" class="stack">
-            <p class="t-headline">Vorschau</p>
-            <p class="t-footnote muted">
-                Die ersten {{ previewRows.length }} von {{ totalRows }} Zeilen mit der gewählten Zuordnung.
-                Dubletten gegen bereits vorhandene Kontakte werden erst beim Übernehmen geprüft und übersprungen —
-                nicht überschrieben.
-            </p>
-
             <UiBadge v-if="nachnameFehltIn" tone="warn">
                 {{ nachnameFehltIn }} von {{ previewRows.length }} Vorschauzeilen ohne Nachname (Pflichtfeld) —
                 diese Zeilen werden beim Übernehmen als fehlerhaft gemeldet.
             </UiBadge>
 
-            <div class="tabelle-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Vorname</th><th>Nachname</th><th>E-Mail</th><th>Telefon</th>
-                            <th>Firma</th><th>Position</th><th>Abteilung</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(z, i) in previewRows" :key="i" :class="{ warnung: spalteWert(z, 'lastName') === '' }">
-                            <td>{{ spalteWert(z, 'firstName') || '—' }}</td>
-                            <td>
-                                <span v-if="spalteWert(z, 'lastName')">{{ spalteWert(z, 'lastName') }}</span>
-                                <UiBadge v-else tone="warn">fehlt</UiBadge>
-                            </td>
-                            <td>
-                                {{ spalteWert(z, 'email') || '—' }}
-                                <UiBadge v-if="istVorschauDuplikat(z)" tone="warn">Dublette in Datei</UiBadge>
-                            </td>
-                            <td>{{ spalteWert(z, 'phone') || '—' }}</td>
-                            <td>{{ spalteWert(z, 'company') || '—' }}</td>
-                            <td>{{ spalteWert(z, 'position') || '—' }}</td>
-                            <td>{{ spalteWert(z, 'department') || '—' }}</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="knopfreihe">
+                <UiButton @click="schritt = 'auswahl'">Zurück</UiButton>
+                <UiButton :disabled="laedt" @click="uebernehmen(false)">
+                    {{ laedt ? 'Wird übernommen …' : 'Direkt übernehmen' }}
+                </UiButton>
+                <UiButton variant="primary" :disabled="laedt" @click="zurVorschau">
+                    {{ laedt ? 'Wird abgeglichen …' : 'Weiter zur Vorschau' }}
+                </UiButton>
             </div>
+        </UiCard>
+
+        <!-- Schritt 3: Vorschau mit Abgleich gegen den Bestand -->
+        <UiCard v-if="schritt === 'vorschau' && abgleich" class="stack">
+            <p class="t-headline">Vorschau &amp; Abgleich</p>
+            <p class="t-footnote muted">
+                {{ abgleich.summary.totalRows }} Zeilen geprüft, {{ abgleich.summary.withMatches }} davon mit
+                möglichem Treffer im Bestand. Beim Ergänzen werden nur LEERE Felder des Bestandskontakts gefüllt —
+                vorhandene Werte bleiben unangetastet.
+            </p>
+
+            <div v-if="zeilenMitTreffer.length" class="knopfreihe knopfreihe--links">
+                <UiButton size="sm" @click="alleSicherErgaenzen">Alle mit sicherem Treffer ergänzen</UiButton>
+                <UiButton size="sm" @click="alleAlsNeuAnlegen">Alle als neu anlegen</UiButton>
+            </div>
+
+            <div class="abgleich-liste">
+                <UiCard v-for="z in zeilenMitTreffer" :key="z.row" class="abgleich-zeile">
+                    <p v-if="z.dateiDublette" class="t-footnote hinweis-datei">
+                        Diese Person steht bereits in Zeile {{ z.dateiDublette }} dieser Datei.
+                        Vorgeschlagen ist deshalb „Überspringen" — sonst entstehen zwei Kontakte
+                        aus einem Import.
+                    </p>
+                    <div class="abgleich-kopf">
+                        <span class="t-subhead abgleich-name">{{ z.name || '—' }}</span>
+                        <span class="t-footnote muted">{{ z.email || 'keine E-Mail' }}</span>
+                        <span v-if="z.firma" class="t-footnote muted">· {{ z.firma }}</span>
+                    </div>
+
+                    <UiSegmented :options="ENTSCHEIDUNG_OPTIONEN" :model-value="entscheidungFuer(z).action"
+                                 @update:model-value="(a) => aktionSetzen(z, a)" />
+
+                    <div v-if="entscheidungFuer(z).action === 'aktualisieren'" class="treffer-liste">
+                        <label v-for="t in z.treffer" :key="t.id" class="treffer-kandidat">
+                            <input v-if="z.treffer.length > 1" type="radio" :name="`kontakt-${z.row}`"
+                                   :checked="entscheidungFuer(z).contactId === t.id" @change="kontaktWaehlen(z, t.id)" />
+                            <div class="treffer-inhalt">
+                                <div class="row">
+                                    <UiBadge :tone="t.sicherheit === 'sicher' ? 'quiet' : 'warn'">
+                                        {{ SICHERHEIT_LABEL[t.sicherheit] }}
+                                    </UiBadge>
+                                    <RouterLink :to="`/kontakte/${t.id}`" class="t-footnote" @click.stop>{{ t.name }}</RouterLink>
+                                    <span class="t-footnote muted">{{ t.email || 'keine E-Mail' }}</span>
+                                    <span v-if="t.firma" class="t-footnote muted">· {{ t.firma }}</span>
+                                </div>
+                                <p class="t-caption muted grund">{{ t.grund }}</p>
+                            </div>
+                        </label>
+                    </div>
+                </UiCard>
+            </div>
+
+            <p v-if="zeilenOhneTreffer.length" class="t-footnote muted">
+                {{ zeilenOhneTreffer.length }} weitere Zeile{{ zeilenOhneTreffer.length === 1 ? '' : 'n' }} ohne
+                Treffer im Bestand — {{ zeilenOhneTreffer.length === 1 ? 'wird' : 'werden' }} als neuer Kontakt angelegt.
+            </p>
 
             <div class="knopfreihe">
                 <UiButton @click="zurZuordnung">Zurück</UiButton>
-                <UiButton variant="primary" :disabled="laedt" @click="uebernehmen">
-                    {{ laedt ? 'Wird übernommen …' : `${totalRows} Zeilen übernehmen` }}
+                <UiButton variant="primary" :disabled="laedt" @click="uebernehmen(true)">
+                    {{ laedt ? 'Wird übernommen …' : `${abgleich.summary.totalRows} Zeilen übernehmen` }}
                 </UiButton>
             </div>
         </UiCard>
@@ -258,11 +365,26 @@ function neuerImport() {
                     <span class="t-large-title">{{ bericht.summary.skipped }}</span>
                     <span class="t-footnote muted">übersprungen (Dublette)</span>
                 </div>
+                <div v-if="bericht.summary.updated != null" class="kennzahl">
+                    <span class="t-large-title">{{ bericht.summary.updated }}</span>
+                    <span class="t-footnote muted">ergänzt</span>
+                </div>
                 <div class="kennzahl">
                     <span class="t-large-title">{{ bericht.summary.failed }}</span>
                     <span class="t-footnote muted">fehlerhaft</span>
                 </div>
             </div>
+
+            <template v-if="bericht.updated?.length">
+                <p class="t-caption">Ergänzte Bestandskontakte (nur zuvor leere Felder wurden gefüllt)</p>
+                <ul class="berichtliste">
+                    <li v-for="(u, i) in bericht.updated" :key="i">
+                        Zeile {{ u.row }}:
+                        <RouterLink :to="`/kontakte/${u.id}`">{{ u.name || '—' }}</RouterLink>
+                        — ergänzt: {{ u.ergaenzteFelder.join(', ') || '—' }}
+                    </li>
+                </ul>
+            </template>
 
             <template v-if="bericht.skippedDuplicates.length">
                 <p class="t-caption">Übersprungene Dubletten (E-Mail bereits im Mandanten vorhanden)</p>
@@ -344,12 +466,7 @@ header p { margin: var(--sp-1) 0 0; }
 
 .knopfreihe { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 .knopfreihe :deep(.btn) { min-height: 44px; }
-
-.tabelle-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 640px; }
-th { text-align: left; padding: var(--sp-2) var(--sp-3); font-size: var(--text-caption); color: var(--label-tertiary); }
-td { padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--separator); font-size: var(--text-subhead); white-space: nowrap; }
-tr.warnung td { background: color-mix(in srgb, var(--warning) 8%, transparent); }
+.knopfreihe--links { justify-content: flex-start; flex-wrap: wrap; }
 
 .kennzahlen { display: flex; gap: var(--sp-6); flex-wrap: wrap; }
 .kennzahl { display: flex; flex-direction: column; gap: 2px; }
@@ -358,9 +475,33 @@ tr.warnung td { background: color-mix(in srgb, var(--warning) 8%, transparent); 
 .berichtliste li { font-size: var(--text-footnote); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-s); background: var(--fill-quaternary); }
 .berichtliste li.fehlerzeile { color: var(--danger); }
 
+/* Schritt 3: Abgleich gegen den Bestand */
+.abgleich-liste { display: flex; flex-direction: column; gap: var(--sp-3); }
+.abgleich-zeile { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); }
+.abgleich-kopf { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); }
+.abgleich-name { font-weight: 600; }
+
+.treffer-liste { display: flex; flex-direction: column; gap: var(--sp-2); }
+.hinweis-datei { color: var(--label-secondary); margin: 0 0 var(--sp-2); }
+.treffer-kandidat {
+    display: flex; align-items: flex-start; gap: var(--sp-3);
+    padding: var(--sp-3);
+    min-height: 44px;
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-m);
+    background: var(--fill-quaternary);
+    cursor: pointer;
+}
+.treffer-kandidat input[type="radio"] { margin-top: 3px; flex: none; width: 18px; height: 18px; }
+.treffer-inhalt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.treffer-inhalt .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.grund { margin: 0; }
+
 @media (max-width: 700px) {
     .knopfreihe { flex-direction: column-reverse; }
     .knopfreihe :deep(.btn) { width: 100%; }
+    .knopfreihe--links { flex-direction: row; }
+    .knopfreihe--links :deep(.btn) { width: auto; }
     .zuordnung-zeile { flex-direction: column; align-items: stretch; }
     .zuordnung-auswahl { width: 100%; }
 }
