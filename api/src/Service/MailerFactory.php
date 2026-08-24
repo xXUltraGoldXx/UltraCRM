@@ -30,10 +30,34 @@ final class MailerFactory
             return null;
         }
 
-        // Der Mandantenfilter greift hier nicht immer (Cron laeuft ohne
-        // angemeldeten Benutzer), deshalb ausdruecklich nach tenant filtern.
-        return $this->em->getRepository(MailSetting::class)
-            ->findOneBy(['tenant' => $tenant, 'active' => true]);
+        // Der Mandantenfilter steht bei einer anonymen Anfrage (oeffentlicher
+        // Lead-Endpunkt, Cron ohne angemeldeten Benutzer) auf "zu" (tenant_id
+        // = 0, TenantFilterSubscriber) — er wird NICHT einfach ignoriert, nur
+        // weil hier zusaetzlich explizit nach $tenant gefiltert wird. Beide
+        // Bedingungen werden von Doctrine UND-verknuepft, also
+        // "tenant = 3 AND tenant_id = 0", was nie zutrifft. Ohne dieses
+        // Abschalten fand der oeffentliche Lead-Endpunkt seinen eigenen
+        // Versandweg nie — live entdeckt: Testmail ueber /api/mail/test (mit
+        // angemeldetem Benutzer, Filter korrekt auf den echten Mandanten)
+        // gelang, dieselbe Einstellung blieb aus dem anonymen Lead-Endpunkt
+        // heraus unsichtbar (Analyse.md C44).
+        $filters = $this->em->getFilters();
+        $warAn = $filters->isEnabled('tenant_filter');
+        if ($warAn) {
+            $filters->disable('tenant_filter');
+        }
+
+        try {
+            return $this->em->getRepository(MailSetting::class)
+                ->findOneBy(['tenant' => $tenant, 'active' => true]);
+        } finally {
+            if ($warAn) {
+                // enable() nach disable() liefert eine NEUE Filterinstanz
+                // ohne Parameter zurueck (C32) — deshalb hier erneut setzen,
+                // nicht einfach enable() allein aufrufen.
+                $filters->enable('tenant_filter')->setParameter('tenant_id', '0');
+            }
+        }
     }
 
     /** @throws \RuntimeException wenn kein brauchbarer Versandweg hinterlegt ist */

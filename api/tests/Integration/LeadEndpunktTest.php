@@ -4,6 +4,7 @@ namespace App\Tests\Integration;
 
 use App\Entity\Contact;
 use App\Entity\LeadForm;
+use App\Entity\MailSetting;
 use App\Entity\Tenant;
 
 /**
@@ -126,6 +127,68 @@ final class LeadEndpunktTest extends IntegrationTestCase
 
         self::assertContains(429, $codes, 'Nach mehreren Einsendungen muss abgeriegelt werden.');
         self::assertLessThan(8, $this->em->getRepository(Contact::class)->count([]));
+    }
+
+    /**
+     * Analyse.md C44: Der Mandantenfilter steht bei einer anonymen Anfrage
+     * auf "zu" (tenant_id = 0). `MailerFactory::findSetting()` filtert
+     * zusaetzlich explizit nach dem Mandanten — beide Bedingungen werden
+     * von Doctrine UND-verknuepft, ohne ausdrueckliches Abschalten des
+     * Filters fand der oeffentliche Lead-Endpunkt seinen eigenen Versandweg
+     * deshalb nie. Live entdeckt: /api/mail/test (mit angemeldetem
+     * Benutzer) gelang, derselbe Versandweg blieb aus dem anonymen
+     * Lead-Endpunkt heraus unsichtbar.
+     *
+     * Der Host ist absichtlich eine private Adresse: das laesst die
+     * SSRF-Pruefung sofort und ohne Netzwerkzugriff scheitern. Es geht
+     * hier nicht darum, ob der Versand gelingt, sondern ob die
+     * Einstellung ueberhaupt GEFUNDEN wird — erkennbar daran, welche der
+     * beiden Aufgaben entsteht.
+     */
+    public function testOeffentlicherEndpunktFindetDenEigenenVersandweg(): void
+    {
+        $a = $this->mandant('Mandant A', 'a');
+        $this->versandweg($a);
+        $formular = $this->formular($a);
+
+        $this->anfrage('POST', '/api/public/leads', null, [
+            'token' => $formular->getToken(),
+            'lastName' => 'Findet',
+            'email' => 'findet@test.invalid',
+            'consent' => true,
+        ], 'application/json');
+
+        $aufgabe = $this->em->getConnection()->fetchOne(
+            "SELECT subject FROM activity a JOIN contact c ON c.id = a.contact_id WHERE c.last_name = 'Findet'"
+        );
+
+        self::assertNotSame(
+            'Kein Versandweg hinterlegt — Bestätigung nicht verschickt',
+            $aufgabe,
+            'findSetting() haette den vorhandenen Versandweg finden muessen (C44).'
+        );
+        self::assertSame('Bestätigungsmail konnte nicht zugestellt werden', $aufgabe);
+    }
+
+    private function versandweg(Tenant $mandant): MailSetting
+    {
+        $einstellung = (new MailSetting())
+            ->setProvider('smtp')
+            ->setHost('10.0.0.5') // privat, SSRF-Pruefung greift ohne Netzwerkzugriff
+            ->setPort(587)
+            ->setUsername('irrelevant')
+            ->setFromAddress('crm@example.invalid')
+            ->setFromName('Test')
+            ->setActive(true);
+        $einstellung->setTenant($mandant);
+        $einstellung->setSecret(
+            self::getContainer()->get(\App\Service\SecretBox::class)->encrypt('irrelevant')
+        );
+
+        $this->em->persist($einstellung);
+        $this->em->flush();
+
+        return $einstellung;
     }
 
     /**
