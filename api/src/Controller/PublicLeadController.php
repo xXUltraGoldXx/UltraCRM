@@ -106,13 +106,44 @@ final class PublicLeadController extends AbstractPublicController
             );
         }
 
-        // Double-Opt-in: nur wenn eine Adresse da ist UND der Mandant einen
-        // Versandweg hinterlegt hat. Ohne Versand bliebe der Kontakt sonst
-        // dauerhaft unbestaetigt und damit unbenutzbar.
+        // Double-Opt-in: Wer eine Adresse angegeben hat, bekommt einen
+        // Bestaetigungstoken — auch dann, wenn der Mandant (noch) keinen
+        // Versandweg hinterlegt hat.
+        //
+        // Vorher wurde der Token in diesem Fall weggelassen, damit der
+        // Kontakt nicht "unbenutzbar" bleibt. Das hiess aber: solange kein
+        // SMTP eingerichtet ist, gilt jeder Formular-Lead sofort als
+        // bewerbbar, ohne dass irgendjemand bestaetigt hat. Das ist die
+        // bequeme Richtung, nicht die sichere — und es trifft genau den
+        // Zustand eines frisch eingerichteten Mandanten (Analyse.md C33).
         $setting = $this->mailer->findSetting($form->getTenant());
-        if ($kontakt->getEmail() && $setting !== null) {
+        if ($kontakt->getEmail()) {
             $token = bin2hex(random_bytes(24));
             $kontakt->setConfirmToken($token);
+
+            if ($setting === null) {
+                // Kein Versandweg: die Bestaetigung kann niemand anfordern.
+                // Das darf nicht still passieren, sonst wundert sich der
+                // Mandant, warum seine Leads nie freigegeben werden.
+                $this->em->persist(
+                    (new Activity())
+                        ->setTenant($form->getTenant())
+                        ->setType('aufgabe')
+                        ->setSubject('Kein Versandweg hinterlegt — Bestätigung nicht verschickt')
+                        ->setBody(
+                            'Für ' . $kontakt->getEmail() . ' konnte keine Bestätigungsmail '
+                            . 'verschickt werden, weil unter Einstellungen kein Versandweg '
+                            . 'eingerichtet ist. Der Kontakt bleibt so lange nicht für Werbung '
+                            . 'freigegeben.'
+                        )
+                        ->setDueAt(new \DateTimeImmutable('+1 day'))
+                        ->setContact($kontakt)
+                );
+
+                $this->em->flush();
+
+                return new JsonResponse(['status' => 'ok'], 202);
+            }
 
             $link = sprintf('https://crm.ultragold.de/api/public/leads/confirm/%s', $token);
             $fehler = $this->mailer->send(
@@ -172,19 +203,10 @@ final class PublicLeadController extends AbstractPublicController
         $this->em->persist(new LeadAttempt($ipHash));
         $this->em->flush();
 
-        $filters = $this->em->getFilters();
-        $warAn = $filters->isEnabled('tenant_filter');
-        if ($warAn) {
-            $filters->disable('tenant_filter');
-        }
-
-        try {
-            $kontakt = $this->em->getRepository(Contact::class)->findOneBy(['confirmToken' => $token]);
-        } finally {
-            if ($warAn) {
-                $filters->enable('tenant_filter');
-            }
-        }
+        $kontakt = $this->ohneMandantenfilter(
+            $this->em,
+            fn () => $this->em->getRepository(Contact::class)->findOneBy(['confirmToken' => $token])
+        );
 
         if ($kontakt === null) {
             return new Response($this->seite('Link nicht gültig', 'Dieser Bestätigungslink ist abgelaufen oder wurde bereits benutzt.'), 404, ['Content-Type' => 'text/html; charset=utf-8']);
@@ -238,21 +260,10 @@ final class PublicLeadController extends AbstractPublicController
             return null;
         }
 
-        $filters = $this->em->getFilters();
-        $warAn = $filters->isEnabled('tenant_filter');
-        if ($warAn) {
-            $filters->disable('tenant_filter');
-        }
-
-        try {
-            $form = $this->em->getRepository(LeadForm::class)->findOneBy(['token' => $token, 'active' => true]);
-        } finally {
-            if ($warAn) {
-                $filters->enable('tenant_filter');
-            }
-        }
-
-        return $form;
+        return $this->ohneMandantenfilter(
+            $this->em,
+            fn () => $this->em->getRepository(LeadForm::class)->findOneBy(['token' => $token, 'active' => true])
+        );
     }
 
     private function kurz(mixed $wert, int $max): ?string

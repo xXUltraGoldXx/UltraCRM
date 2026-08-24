@@ -48,7 +48,10 @@ final class TenantPipelineListener
                 ->setName($name)
                 ->setArt($art)
                 ->setPosition($position++);
-            $phase->setPipeline($pipeline);
+            // addStage() setzt die Rueckrichtung mit: sonst kennt die frisch
+            // angelegte Pipeline ihre Phasen im selben Durchgang nicht, und
+            // wer sie direkt danach ausliest, sieht eine leere Liste.
+            $pipeline->addStage($phase);
             $phase->setTenant($tenant);
             $em->persist($phase);
         }
